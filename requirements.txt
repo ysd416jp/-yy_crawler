@@ -1,3 +1,4 @@
-requests
-beautifulsoup4
-line-bot-sdk
+streamlit
+gspread
+oauth2client
+google-genai
