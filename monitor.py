@@ -25,23 +25,24 @@ def main():
         old_hash = row[4] if len(row) > 4 else ""
         if not word: continue
 
-        # --- 【改修】ドメインだけAIに聞く「ハイブリッド生成」 ---
-        if not current_url and memo and memo != "HP更新":
+        # --- 【絶対ルール】既存URLの有無に関わらず、毎回AIがURLを錬成する ---
+        if memo and memo != "HP更新":
             try:
-                # ドメイン名だけを答えさせる厳しい指示
-                prompt = f"サービス名『{memo}』の公式ドメイン名のみ回答せよ。例：x.com, indeed.com。余計な説明は不要。"
+                # ドメインだけをAIに聞く（汎用性の維持）
+                prompt = f"サービス名『{memo}』のドメイン名のみ回答せよ。例：x.com, indeed.com。余計な説明は不要。"
                 response = client_ai.models.generate_content(
                     model="gemini-3-flash-preview", 
                     contents=prompt
                 )
                 domain = response.text.strip().replace("`", "")
                 
-                # キーワード(word)は Python 側で正確にURLに組み込む（鮭化を防止）
+                # キーワード(word)はPython側で正確にURLに組み込む（鮭化を防止）
                 encoded_word = urllib.parse.quote(word)
                 current_url = f"https://www.google.com/search?q={encoded_word}+site:{domain}&tbs=qdr:d"
                 
+                # 既存のURLがあっても「強制的に」最新のAI製URLで上書き
                 sheet.update_cell(i, 2, current_url)
-                print(f"Row {i}: URL Protected & Saved -> {current_url}")
+                print(f"Row {i}: URL Refreshed by AI -> {current_url}")
             except Exception as e: print(f"Row {i} Gemini Error: {e}")
 
         if not current_url: continue
