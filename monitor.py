@@ -19,27 +19,47 @@ def main():
     client_ai = genai.Client(api_key=GEMINI_API_KEY)
     line_bot_api = LineBotApi(LINE_TOKEN)
     headers = {"User-Agent": "Mozilla/5.0"}
+
     for i, row in enumerate(data[1:], start=2):
         word, current_url, memo = row[0], row[1], row[2]
         old_hash = row[4] if len(row) > 4 else ""
         if not word: continue
+
+        # --- AIによる高度な検索URL錬成 ---
         if not current_url and memo and memo != "HP更新":
             try:
+                # プロンプトを進化：検索戦略をAIに考えさせる
+                prompt = (
+                    f"目的：キーワード『{word}』の新着情報をWebサイト『{memo}』からGoogle検索で見つけ出す。\n"
+                    f"タスク：最もヒット率の高いGoogle検索URL（URL全体）を1つ生成せよ。\n"
+                    f"制約：1. 『{memo}』という愛称をx.comやjalan.net等の適切なドメインに変換しsite:演算子を使うこと。"
+                    f"2. 24時間以内の新着指定（&tbs=qdr:d）を必ずURLに含めること。回答はURLのみ。"
+                )
                 response = client_ai.models.generate_content(
                     model="gemini-3-flash-preview",
-                    contents=f"サイト「{memo}」のドメインのみ。例: x.com"
+                    contents=prompt
                 )
-                domain = response.text.strip().replace("`", "")
-                current_url = f"https://www.google.com/search?q={word}+site:{domain}&tbs=qdr:d"
-                sheet.update_cell(i, 2, current_url)
-                print(f"Row {i}: URL saved!")
+                # URL以外のノイズ（マークダウン等）を除去
+                generated_url = response.text.strip().split('\n')[0].replace("`", "")
+                
+                if "http" in generated_url:
+                    current_url = generated_url
+                    sheet.update_cell(i, 2, current_url)
+                    print(f"Row {i}: Evolved URL saved -> {current_url}")
             except Exception as e: print(f"Row {i} Gemini Error: {e}")
+
         if not current_url: continue
+
+        # 監視・通知ロジック
         try:
             res = requests.get(current_url, headers=headers, timeout=20)
             new_hash = hashlib.md5(res.text.encode()).hexdigest()
-            if word in res.text and "見つかりませんでした" not in res.text and new_hash != old_hash:
-                line_bot_api.push_message(USER_ID, TextSendMessage(text=f"【発見】{word} ({memo})\n{current_url}"))
-                sheet.update_cell(i, 5, new_hash)
+            # ヒット判定（除外ワードを考慮）
+            exclude = ["0件", "見つかりませんでした", "一致する情報はありません"]
+            if word in res.text and not any(ex in res.text for ex in exclude):
+                if new_hash != old_hash:
+                    line_bot_api.push_message(USER_ID, TextSendMessage(text=f"【発見】{word} ({memo})\n{current_url}"))
+                    sheet.update_cell(i, 5, new_hash)
         except Exception as e: print(f"Row {i} Net Error: {e}")
+
 if __name__ == "__main__": main()

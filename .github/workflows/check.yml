@@ -1,4 +1,4 @@
-name: Sushi Watcher 3-Flash-Final
+name: Sushi Watcher 3-Flash-Evolved
 on:
   schedule:
     - cron: '0 * * * *'
