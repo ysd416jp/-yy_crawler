@@ -1,33 +1,45 @@
-import os
-import requests
-from bs4 import BeautifulSoup
+import os, json, hashlib, requests, gspread
+from google import genai
+from oauth2client.service_account import ServiceAccountCredentials
 from linebot import LineBotApi
 from linebot.models import TextSendMessage
 
-# GitHub Secretsから読み込み
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 LINE_TOKEN = os.environ.get("LINE_ACCESS_TOKEN")
 USER_ID = os.environ.get("LINE_USER_ID")
+SERVICE_ACCOUNT_JSON = json.loads(os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON"))
+SHEET_ID = "1wSfyGreLH_lb7vR_vpmuJ3rAndtMNvMDQbv2ZlPVxUE"
 
 def main():
-    url = "https://townwork.net/jozen/hokkaido/shisetsu_01204/kw0000000000/"
-    word = "鮨ゆきち"
-    
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-    
-    try:
-        res = requests.get(url, headers=headers)
-        res.raise_for_status()
-        
-        if word in res.text:
-            line_bot_api = LineBotApi(LINE_TOKEN)
-            message = f"【速報】「{word}」の情報を発見しました！\n{url}"
-            line_bot_api.push_message(USER_ID, TextSendMessage(text=message))
-            print("発見：LINEを送信しました。")
-        else:
-            print("未発見：まだ情報は出ていないようです。")
-            
-    except Exception as e:
-        print(f"エラー発生: {e}")
-
-if __name__ == "__main__":
-    main()
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(SERVICE_ACCOUNT_JSON, scope)
+    client_gs = gspread.authorize(creds)
+    sheet = client_gs.open_by_key(SHEET_ID).sheet1
+    data = sheet.get_all_values()
+    client_ai = genai.Client(api_key=GEMINI_API_KEY)
+    line_bot_api = LineBotApi(LINE_TOKEN)
+    headers = {"User-Agent": "Mozilla/5.0"}
+    for i, row in enumerate(data[1:], start=2):
+        word, current_url, memo = row[0], row[1], row[2]
+        old_hash = row[4] if len(row) > 4 else ""
+        if not word: continue
+        if not current_url and memo and memo != "HP更新":
+            try:
+                response = client_ai.models.generate_content(
+                    model="gemini-3-flash-preview",
+                    contents=f"サイト「{memo}」のドメインのみ。例: x.com"
+                )
+                domain = response.text.strip().replace("`", "")
+                current_url = f"https://www.google.com/search?q={word}+site:{domain}&tbs=qdr:d"
+                sheet.update_cell(i, 2, current_url)
+                print(f"Row {i}: URL saved!")
+            except Exception as e: print(f"Row {i} Gemini Error: {e}")
+        if not current_url: continue
+        try:
+            res = requests.get(current_url, headers=headers, timeout=20)
+            new_hash = hashlib.md5(res.text.encode()).hexdigest()
+            if word in res.text and "見つかりませんでした" not in res.text and new_hash != old_hash:
+                line_bot_api.push_message(USER_ID, TextSendMessage(text=f"【発見】{word} ({memo})\n{current_url}"))
+                sheet.update_cell(i, 5, new_hash)
+        except Exception as e: print(f"Row {i} Net Error: {e}")
+if __name__ == "__main__": main()
