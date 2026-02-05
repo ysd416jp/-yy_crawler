@@ -6,7 +6,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 
 def main():
     # 1. GitHub Secrets から真空パックされた鍵を取得
-    encoded_json = os.environ.get("GCP_SA_KEY")
+    encoded_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
     if not encoded_json:
         print("Error: GCP_SA_KEY not found in environment variables.")
         return
