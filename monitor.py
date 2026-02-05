@@ -1,10 +1,9 @@
-import os, json, hashlib, requests, gspread
+import os, json, hashlib, requests, gspread, urllib.parse
 from google import genai
 from oauth2client.service_account import ServiceAccountCredentials
 from linebot import LineBotApi
 from linebot.models import TextSendMessage
 
-# 鍵の読み込み（GitHub Secrets からの注入を想定）
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 LINE_TOKEN = os.environ.get("LINE_ACCESS_TOKEN")
 USER_ID = os.environ.get("LINE_USER_ID")
@@ -26,28 +25,28 @@ def main():
         old_hash = row[4] if len(row) > 4 else ""
         if not word: continue
 
-        # --- 検証済み：AIによる自律的ドメイン推論 ---
+        # --- 【改修】ドメインだけAIに聞く「ハイブリッド生成」 ---
         if not current_url and memo and memo != "HP更新":
             try:
-                prompt = (
-                    f"タスク：サービス名『{memo}』からドメインを特定し、"
-                    f"キーワード『{word}』を24時間以内の新着に絞って検索するGoogle検索URLを1つ生成せよ。\n"
-                    f"制約：適切なドメイン（indeed.com等）に自力で変換し、回答はURLのみとすること。"
-                )
+                # ドメイン名だけを答えさせる厳しい指示
+                prompt = f"サービス名『{memo}』の公式ドメイン名のみ回答せよ。例：x.com, indeed.com。余計な説明は不要。"
                 response = client_ai.models.generate_content(
                     model="gemini-3-flash-preview", 
                     contents=prompt
                 )
-                url = response.text.strip().replace("`", "")
-                if "http" in url:
-                    current_url = url
-                    sheet.update_cell(i, 2, current_url)
-                    print(f"Row {i}: URL Evolved -> {current_url}")
+                domain = response.text.strip().replace("`", "")
+                
+                # キーワード(word)は Python 側で正確にURLに組み込む（鮭化を防止）
+                encoded_word = urllib.parse.quote(word)
+                current_url = f"https://www.google.com/search?q={encoded_word}+site:{domain}&tbs=qdr:d"
+                
+                sheet.update_cell(i, 2, current_url)
+                print(f"Row {i}: URL Protected & Saved -> {current_url}")
             except Exception as e: print(f"Row {i} Gemini Error: {e}")
 
         if not current_url: continue
 
-        # 巡回監視とLINE通知
+        # 巡回監視ロジック
         try:
             res = requests.get(current_url, headers=headers, timeout=20)
             res.encoding = res.apparent_encoding
