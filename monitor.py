@@ -1,26 +1,25 @@
-import os, json, gspread
+import os, base64, json, gspread, re
 from oauth2client.service_account import ServiceAccountCredentials
 
 def main():
-    # 1. 環境変数からJSONを直接読み込む
-    raw_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
-    if not raw_json:
+    encoded_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
+    if not encoded_json:
         print("Error: GOOGLE_SERVICE_ACCOUNT_JSON is empty.")
         return
 
     try:
-        # 2. JSONを解析し、秘密鍵の改行を補正
-        creds_dict = json.loads(raw_json)
+        # 1. Base64デコード（余計な改行やゴミを掃除して解凍）
+        clean_b64 = re.sub(r'[^A-Za-z0-9+/=]', '', encoded_json)
+        creds_dict = json.loads(base64.b64decode(clean_b64).decode('utf-8'))
+        
+        # 2. 秘密鍵の改行補正
         if "private_key" in creds_dict:
-            # 秘密鍵内の \n 文字を実際の改行に変換
             creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
 
-        # 3. 認証
+        # 3. 認証と接続確認
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
-        
-        # 4. 接続確認
         sheet = client.open_by_key("1wSfyGreLH_lb7vR_vpmuJ3rAndtMNvMDQbv2ZlPVxUE").sheet1
         print("Successfully connected to the sheet!")
         
