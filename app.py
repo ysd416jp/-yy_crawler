@@ -3,20 +3,24 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
 
-# UI設定
 st.set_page_config(page_title="webwatch", layout="centered")
 
 def get_sheet():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    # Secretsから文字列を取得
-    raw_json = st.secrets["GOOGLE_SERVICE_ACCOUNT_JSON"]
-    # JSONとして読み込む
-    creds_dict = json.loads(raw_json)
+    # Secretsから生データを取得
+    raw_json = st.secrets["GOOGLE_SERVICE_ACCOUNT_JSON"].strip()
     
-    # 【最重要】秘密鍵の改行コードを「本物の改行」に強制変換し、余計な空白を削除
+    # JSONとして読み込む
+    creds_dict = json.loads(raw_json, strict=False)
+    
+    # 【最強補正】秘密鍵の形式を物理的に正常化する
     if "private_key" in creds_dict:
-        fixed_key = creds_dict["private_key"].replace("\\n", "\n").strip()
-        creds_dict["private_key"] = fixed_key
+        key = creds_dict["private_key"]
+        # 1. バックスラッシュの重なりを解消
+        key = key.replace("\\\\n", "\n").replace("\\n", "\n")
+        # 2. 余計な空白やクォーテーションを徹底削除
+        key = key.strip().strip("'").strip('"')
+        creds_dict["private_key"] = key
     
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
@@ -32,16 +36,13 @@ THEMES = {
 
 st.title("webwatch")
 
-# 設定セクション
 with st.expander("Settings / Theme"):
     selected_theme = st.selectbox("Select Theme", list(THEMES.keys()), index=0)
 st.markdown(THEMES[selected_theme], unsafe_allow_html=True)
 
-# メインモード選択
 mode = st.radio("Check Type", ["Website Update", "Keyword Tracking"], horizontal=True)
 st.divider()
 
-# フォーム
 with st.form("main_form", clear_on_submit=True):
     if mode == "Website Update":
         target_url = st.text_input("Target URL", placeholder="https://example.com")
