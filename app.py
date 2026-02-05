@@ -8,14 +8,15 @@ st.set_page_config(page_title="webwatch", layout="centered")
 
 def get_sheet():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    # Secretsから生データを取得
+    # Secretsから文字列を取得
     raw_json = st.secrets["GOOGLE_SERVICE_ACCOUNT_JSON"]
-    creds_dict = json.loads(raw_json, strict=False)
+    # JSONとして読み込む
+    creds_dict = json.loads(raw_json)
     
-    # 【最重要】秘密鍵の改行コードを「本物の改行」に強制変換
+    # 【最重要】秘密鍵の改行コードを「本物の改行」に強制変換し、余計な空白を削除
     if "private_key" in creds_dict:
-        # \\n (リテラル) を \n (実際の改行) に変換
-        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+        fixed_key = creds_dict["private_key"].replace("\\n", "\n").strip()
+        creds_dict["private_key"] = fixed_key
     
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
