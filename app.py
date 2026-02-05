@@ -10,27 +10,21 @@ st.set_page_config(page_title="webwatch", layout="centered")
 def get_sheet():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     
-    # 1. Secretsから文字列を取得
-    encoded_raw = st.secrets["ENCODED_JSON"]
+    # 1. 前後のクォーテーションや空白を徹底除去
+    raw_val = st.secrets["ENCODED_JSON"].strip().strip('"').strip("'")
     
-    # 2. 【最強補正】Base64以外の文字（スペース、引用符など）を完全に除去
-    # A-Z, a-z, 0-9, +, / 以外をすべて捨てる
-    clean_b64 = re.sub(r'[^A-Za-z0-9+/]', '', encoded_raw)
+    # 2. Base64として有効な文字以外をすべて排除
+    clean_b64 = re.sub(r'[^A-Za-z0-9+/=]', '', raw_val)
     
-    # 3. 【長さ補正】4の倍数になるように '=' を付け足す
-    missing_padding = len(clean_b64) % 4
-    if missing_padding:
-        clean_b64 += '=' * (4 - missing_padding)
-    
-    # 4. デコードして JSON 復元
-    decoded_creds = base64.b64decode(clean_b64).decode("utf-8")
-    creds_dict = json.loads(decoded_creds)
+    # 3. デコード（ここでエラーが出ないように補正済み）
+    decoded_bytes = base64.b64decode(clean_b64)
+    creds_dict = json.loads(decoded_bytes.decode("utf-8"))
     
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
     return client.open_by_key("1wSfyGreLH_lb7vR_vpmuJ3rAndtMNvMDQbv2ZlPVxUE").sheet1
 
-# --- デザインとUI (変更なし) ---
+# --- デザインとUIは吉田さんの選んだものを維持 ---
 THEMES = {
     "Minimal Monochrome": "<style>.stApp { background-color: #ffffff; color: #000000; } .stButton>button { background-color: #000000; color: #ffffff; }</style>",
     "Dark Cyber": "<style>.stApp { background-color: #0e1117; color: #00ffcc; } .stButton>button { border: 1px solid #00ffcc; box-shadow: 0 0 10px #00ffcc; }</style>",
