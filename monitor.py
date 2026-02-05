@@ -1,4 +1,4 @@
-import os, json, hashlib, requests, gspread
+import os, json, hashlib, requests, gspread, urllib.parse
 from google import genai
 from oauth2client.service_account import ServiceAccountCredentials
 from linebot import LineBotApi
@@ -18,47 +18,47 @@ def main():
     data = sheet.get_all_values()
     client_ai = genai.Client(api_key=GEMINI_API_KEY)
     line_bot_api = LineBotApi(LINE_TOKEN)
-    headers = {"User-Agent": "Mozilla/5.0"}
+    headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}
 
     for i, row in enumerate(data[1:], start=2):
         word, current_url, memo = row[0], row[1], row[2]
         old_hash = row[4] if len(row) > 4 else ""
         if not word: continue
 
-        # --- AIによる高度な検索URL錬成 ---
+        # --- AIによるURL錬成の「進化」：ドメイン名を特定させる ---
         if not current_url and memo and memo != "HP更新":
             try:
-                # プロンプトを進化：検索戦略をAIに考えさせる
+                # 思考のプロセスを指示するプロンプト
                 prompt = (
-                    f"目的：キーワード『{word}』の新着情報をWebサイト『{memo}』からGoogle検索で見つけ出す。\n"
-                    f"タスク：最もヒット率の高いGoogle検索URL（URL全体）を1つ生成せよ。\n"
-                    f"制約：1. 『{memo}』という愛称をx.comやjalan.net等の適切なドメインに変換しsite:演算子を使うこと。"
-                    f"2. 24時間以内の新着指定（&tbs=qdr:d）を必ずURLに含めること。回答はURLのみ。"
+                    f"あなたはWeb調査のスペシャリストです。ターゲット『{word}』の新着情報を『{memo}』というサイトから探すためのURLを作成してください。\n"
+                    f"手順1：『{memo}』の正式なドメインを特定せよ（例：インディード→jp.indeed.com、x→x.com、じゃらん→jalan.net）。\n"
+                    f"手順2：Google検索URLを組み立てよ。形式は https://www.google.com/search?q={{word}}+site:{{domain}}&tbs=qdr:d とする。\n"
+                    f"制約：回答は生成したURLのみ。余計な説明は一切不要。"
                 )
                 response = client_ai.models.generate_content(
                     model="gemini-3-flash-preview",
                     contents=prompt
                 )
-                # URL以外のノイズ（マークダウン等）を除去
                 generated_url = response.text.strip().split('\n')[0].replace("`", "")
                 
                 if "http" in generated_url:
                     current_url = generated_url
                     sheet.update_cell(i, 2, current_url)
-                    print(f"Row {i}: Evolved URL saved -> {current_url}")
+                    print(f"Row {i}: URL Evolved -> {current_url}")
             except Exception as e: print(f"Row {i} Gemini Error: {e}")
 
         if not current_url: continue
 
-        # 監視・通知ロジック
+        # 監視とLINE通知
         try:
             res = requests.get(current_url, headers=headers, timeout=20)
+            res.encoding = res.apparent_encoding
             new_hash = hashlib.md5(res.text.encode()).hexdigest()
-            # ヒット判定（除外ワードを考慮）
-            exclude = ["0件", "見つかりませんでした", "一致する情報はありません"]
+            exclude = ["一致する情報は見つかりませんでした", "0件", "見つかりませんでした"]
             if word in res.text and not any(ex in res.text for ex in exclude):
                 if new_hash != old_hash:
-                    line_bot_api.push_message(USER_ID, TextSendMessage(text=f"【発見】{word} ({memo})\n{current_url}"))
+                    msg = f"【検知】{word} ({memo})\n{current_url}"
+                    line_bot_api.push_message(USER_ID, TextSendMessage(text=msg))
                     sheet.update_cell(i, 5, new_hash)
         except Exception as e: print(f"Row {i} Net Error: {e}")
 
