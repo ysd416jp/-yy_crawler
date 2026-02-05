@@ -8,29 +8,35 @@ import re
 st.set_page_config(page_title="webwatch", layout="centered")
 
 def get_sheet():
-    # 1. セキュリティ設定の読み込み
     if "ENCODED_JSON" not in st.secrets:
-        st.error("❌ エラー：Secretsの中に『ENCODED_JSON』という名前が見つかりません。")
-        return None
-
-    raw_val = st.secrets["ENCODED_JSON"].strip()
-    
-    # デバッグ情報の表示（開発中のみ）
-    if len(raw_val) < 10:
-        st.error(f"❌ エラー：データが短すぎます（現在の長さ: {len(raw_val)}文字）。正しく貼り付けられていない可能性があります。")
+        st.error("Secretsに 'ENCODED_JSON' が設定されていません。")
         return None
 
     try:
-        # クォーテーションを掃除
-        clean_b64 = re.sub(r'[^A-Za-z0-9+/=]', '', raw_val)
+        # 1. Base64デコード
+        encoded_raw = st.secrets["ENCODED_JSON"].strip().strip('"').strip("'")
+        clean_b64 = re.sub(r'[^A-Za-z0-9+/=]', '', encoded_raw)
         decoded_bytes = base64.b64decode(clean_b64)
         creds_dict = json.loads(decoded_bytes.decode("utf-8"))
         
+        # 2. 【外科的修復】秘密鍵の改行とヘッダーを強制補正
+        if "private_key" in creds_dict:
+            pk = creds_dict["private_key"]
+            # 文字としての \n を 本物の改行に変換
+            pk = pk.replace("\\n", "\n")
+            # 重複した改行や余計なスペースを掃除
+            lines = [line.strip() for line in pk.split("\n") if line.strip()]
+            fixed_key = "\n".join(lines)
+            # 最後に必ず改行を入れる（Googleの認証ライブラリの癖対策）
+            if not fixed_key.endswith("\n"):
+                fixed_key += "\n"
+            creds_dict["private_key"] = fixed_key
+
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         return gspread.authorize(creds).open_by_key("1wSfyGreLH_lb7vR_vpmuJ3rAndtMNvMDQbv2ZlPVxUE").sheet1
     except Exception as e:
-        st.error(f"🔍 内部解析エラー：{e}")
+        st.error(f"🔍 鍵の修復に失敗しました: {e}")
         return None
 
 # --- UI デザイン ---
@@ -43,7 +49,7 @@ THEMES = {
 
 st.title("webwatch")
 with st.expander("Settings / Theme"):
-    selected_theme = st.selectbox("Select Theme", list(THEMES.keys()))
+    selected_theme = st.selectbox("Select Theme", list(THEMES.keys()), index=0)
 st.markdown(THEMES[selected_theme], unsafe_allow_html=True)
 
 mode = st.radio("Check Type", ["Website Update", "Keyword Tracking"], horizontal=True)
@@ -52,13 +58,11 @@ st.divider()
 with st.form("main_form", clear_on_submit=True):
     if mode == "Website Update":
         target_url = st.text_input("Target URL")
-        word = "update"
-        memo = "HP更新"
+        word, memo = "update", "HP更新"
     else:
         word = st.text_input("Search Keyword")
         site_alias = st.selectbox("Source", ["x", "indeed", "townwork", "jalan"])
-        memo = site_alias
-        target_url = ""
+        memo, target_url = site_alias, ""
     
     freq = st.select_slider("Frequency", options=[1, 4, 12, 24], value=24)
 
