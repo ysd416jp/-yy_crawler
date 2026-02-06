@@ -1,26 +1,12 @@
-import os, json, gspread
-from oauth2client.service_account import ServiceAccountCredentials
-
+import os
 def main():
-    raw_json = os.environ.get("GCP_JSON")
-    if not raw_json:
-        print("Authentication Error: No key could be detected.")
-        return
-
-    try:
-        creds_dict = json.loads(raw_json)
-        if "private_key" in creds_dict:
-            creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-        client = gspread.authorize(creds)
-        
-        sheet = client.open_by_key("1wSfyGreLH_lb7vR_vpmuJ3rAndtMNvMDQbv2ZlPVxUE").sheet1
-        print("Successfully connected to the sheet!")
-        
-    except Exception as e:
-        print(f"Authentication Error: {e}")
+    # 1. 複数の可能性のある名前で環境変数をチェック
+    names = ["GCP_JSON", "GOOGLE_SERVICE_ACCOUNT_JSON"]
+    for name in names:
+        val = os.environ.get(name, "")
+        print(f"Check {name}: length={len(val)}")
+        if len(val) > 0:
+            print(f"-> Found! starts with: {val[:10]}...")
 
 if __name__ == "__main__":
     main()
