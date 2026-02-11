@@ -14,36 +14,4 @@ jobs:
       - name: Add headers
         env:
           GCP_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-        run: |
-          python3 << 'PYEOF'
-          import os, json, base64, re
-          import gspread
-          from google.oauth2.service_account import Credentials
-
-          raw_val = os.environ.get("GCP_JSON")
-          cleaned_val = re.sub(r'[\s\n]', '', raw_val)
-          if cleaned_val.startswith('{'):
-              creds_info = json.loads(cleaned_val)
-          else:
-              missing_padding = len(cleaned_val) % 4
-              if missing_padding:
-                  cleaned_val += '=' * (4 - missing_padding)
-              creds_info = json.loads(base64.b64decode(cleaned_val).decode('utf-8'))
-
-          if 'private_key' in creds_info:
-              creds_info['private_key'] = creds_info['private_key'].replace('\\n', '\n')
-
-          scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-          creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
-          client = gspread.authorize(creds)
-          sheet = client.open_by_key("1wSfyGreLH_lb7vR_vpmuJ3rAndtMNvMDQbv2ZlPVxUE").sheet1
-
-          headers = sheet.row_values(1)
-          print(f"現在: {headers}")
-          if "prev_hash" not in headers:
-              sheet.update_cell(1, len(headers)+1, "prev_hash")
-              headers.append("prev_hash")
-          if "prev_len" not in headers:
-              sheet.update_cell(1, len(headers)+1, "prev_len")
-          print(f"更新後: {sheet.row_values(1)}")
-          PYEOF
+        run: python add_sheet_headers.py
