@@ -61,7 +61,7 @@ with st.form("main_form", clear_on_submit=True):
         word, memo = "update", "HP更新"
     else:
         word = st.text_input("Search Keyword")
-        site_alias = st.selectbox("Source", ["x", "indeed", "townwork", "jalan"])
+        site_alias = st.selectbox("Source", ["x", "indeed", "townwork", "jalan", "hotpepper"])
         memo, target_url = site_alias, ""
     
     freq = st.select_slider("Frequency", options=[1, 4, 12, 24], value=24)

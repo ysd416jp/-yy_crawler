@@ -12,9 +12,11 @@ jobs:
         with:
           python-version: '3.10'
       - name: Install dependencies
-        run: pip install gspread google-auth google-generativeai
+        run: pip install gspread google-auth google-generativeai requests beautifulsoup4
       - name: Run
         env:
           GCP_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
         run: python monitor.py
