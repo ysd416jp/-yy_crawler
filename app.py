@@ -19,18 +19,16 @@ def get_sheet():
         decoded_bytes = base64.b64decode(clean_b64)
         creds_dict = json.loads(decoded_bytes.decode("utf-8"))
         
-        # 2. 【外科的修復】秘密鍵の改行とヘッダーを強制補正
+        # 2. 秘密鍵の改行修復
         if "private_key" in creds_dict:
             pk = creds_dict["private_key"]
-            # 文字としての \n を 本物の改行に変換
-            pk = pk.replace("\\n", "\n")
-            # 重複した改行や余計なスペースを掃除
-            lines = [line.strip() for line in pk.split("\n") if line.strip()]
-            fixed_key = "\n".join(lines)
-            # 最後に必ず改行を入れる（Googleの認証ライブラリの癖対策）
-            if not fixed_key.endswith("\n"):
-                fixed_key += "\n"
-            creds_dict["private_key"] = fixed_key
+            # エスケープされた \n を実際の改行に変換
+            if "\\n" in pk:
+                pk = pk.replace("\\n", "\n")
+            # 末尾に改行がなければ追加
+            if not pk.endswith("\n"):
+                pk += "\n"
+            creds_dict["private_key"] = pk
 
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
