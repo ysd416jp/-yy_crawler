@@ -187,6 +187,17 @@ def main():
         sheet = client.open_by_key("1wSfyGreLH_lb7vR_vpmuJ3rAndtMNvMDQbv2ZlPVxUE").sheet1
         print("認証成功")
 
+        # ヘッダーにprev_hash, prev_lenがなければ自動追加
+        headers = sheet.row_values(1)
+        if "prev_hash" not in headers:
+            sheet.update_cell(1, len(headers) + 1, "prev_hash")
+            headers.append("prev_hash")
+            print("ヘッダーに prev_hash を追加")
+        if "prev_len" not in headers:
+            sheet.update_cell(1, len(headers) + 1, "prev_len")
+            headers.append("prev_len")
+            print("ヘッダーに prev_len を追加")
+
         # Geminiモデル（キーがあれば）
         gemini_key = os.environ.get("GEMINI_API_KEY")
         gemini_model = None
