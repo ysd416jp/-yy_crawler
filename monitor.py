@@ -26,18 +26,29 @@ def get_credentials():
     if not raw_val:
         raise RuntimeError("GCP_JSON が未設定")
 
-    cleaned_val = re.sub(r'[\s\n]', '', raw_val)
+    raw_stripped = raw_val.strip()
 
-    if cleaned_val.startswith('{'):
-        creds_info = json.loads(cleaned_val)
+    if raw_stripped.startswith('{'):
+        # JSON形式の場合、そのままパース（空白を消さない）
+        creds_info = json.loads(raw_stripped)
     else:
+        # Base64形式の場合
+        cleaned_val = re.sub(r'[\s\n]', '', raw_val)
         missing_padding = len(cleaned_val) % 4
         if missing_padding:
             cleaned_val += '=' * (4 - missing_padding)
         creds_info = json.loads(base64.b64decode(cleaned_val).decode('utf-8'))
 
+    # private_keyの改行修復
     if 'private_key' in creds_info:
-        creds_info['private_key'] = creds_info['private_key'].replace('\\n', '\n')
+        pk = creds_info['private_key']
+        # エスケープされた \n を実際の改行に変換
+        if '\\n' in pk:
+            pk = pk.replace('\\n', '\n')
+        # 末尾に改行がなければ追加
+        if not pk.endswith('\n'):
+            pk += '\n'
+        creds_info['private_key'] = pk
 
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
