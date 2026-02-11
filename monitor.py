@@ -214,7 +214,7 @@ def main():
         gemini_model = None
         if gemini_key:
             genai.configure(api_key=gemini_key)
-            gemini_model = genai.GenerativeModel('gemini-2.0-flash')
+            gemini_model = genai.GenerativeModel('gemini-3-pro-preview')
 
         rows = sheet.get_all_records()
         for i, row in enumerate(rows, start=2):
