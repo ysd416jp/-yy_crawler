@@ -84,12 +84,11 @@ def add():
             sheet.append_row(["update", url, "HP更新", int(freq), "", ""])
     else:
         keyword = request.form.get("keyword", "").strip()
-        # source_type=custom の場合は custom_source を使う
         source_type = request.form.get("source_type", "preset")
         if source_type == "custom":
             source = request.form.get("custom_source", "").strip()
         else:
-            source = request.form.get("source", "x")
+            source = request.form.get("preset_source", "x")
         freq = request.form.get("freq", "12")
         if keyword and source:
             sheet.append_row([keyword, "", source, int(freq), "", ""])

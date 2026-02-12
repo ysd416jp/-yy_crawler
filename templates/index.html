@@ -68,9 +68,9 @@
   }
   .btn-cancel:hover { background: #1e2028; color: #ccc; }
   .hint { font-size: 0.72rem; color: #555; margin-top: 4px; }
-  .source-toggle { display: flex; gap: 8px; margin-top: 6px; }
-  .source-toggle label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; margin: 0; font-size: 0.85rem; color: #bbb; }
-  .source-toggle input[type=radio] { accent-color: #4a90e2; }
+  .source-toggle { display: flex; gap: 16px; margin-top: 6px; }
+  .source-toggle label { display: inline-flex !important; align-items: center; gap: 5px; cursor: pointer; margin: 0 !important; font-size: 0.85rem; color: #bbb; white-space: nowrap; }
+  .source-toggle input[type=radio] { accent-color: #4a90e2; margin: 0; }
   #custom-site-row { margin-top: 10px; }
 
   /* --- セクション見出し --- */
@@ -181,7 +181,7 @@
           <label><input type="radio" name="source_type" value="custom" onchange="toggleSource()"> 新規サイト (AI生成)</label>
         </div>
         <div id="preset-site-row">
-          <select name="source" id="source-select">
+          <select name="preset_source" id="source-select">
             <option value="x">X (Twitter)</option>
             <option value="indeed">Indeed</option>
             <option value="townwork">タウンワーク</option>
@@ -340,18 +340,11 @@ function closeModal(type) {
   document.getElementById('modal-' + type).classList.remove('active');
 }
 
-// 検索先トグル
+// 検索先トグル（表示切替のみ、両フィールドとも常に送信）
 function toggleSource() {
   var isCustom = document.querySelector('input[name="source_type"][value="custom"]').checked;
   document.getElementById('preset-site-row').style.display = isCustom ? 'none' : 'block';
   document.getElementById('custom-site-row').style.display = isCustom ? 'block' : 'none';
-  if (isCustom) {
-    document.getElementById('source-select').removeAttribute('name');
-    document.getElementById('custom-source').setAttribute('name', 'source');
-  } else {
-    document.getElementById('source-select').setAttribute('name', 'source');
-    document.getElementById('custom-source').removeAttribute('name');
-  }
 }
 
 // 編集モーダル
