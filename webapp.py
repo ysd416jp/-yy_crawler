@@ -5,7 +5,7 @@ import base64
 import re
 import gspread
 from google.oauth2.service_account import Credentials
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, Response
 
 app = Flask(__name__)
 
@@ -53,6 +53,19 @@ def get_sheet():
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     client = gspread.authorize(creds)
     return client.open_by_key(SHEET_KEY).sheet1
+
+
+# --- favicon / apple-touch-icon (空SVGで404を回避) ---
+_FAVICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="80" font-size="80">📡</text></svg>'
+
+@app.route("/favicon.ico")
+def favicon():
+    return Response(_FAVICON_SVG, mimetype="image/svg+xml", content_type="image/svg+xml; charset=utf-8")
+
+@app.route("/apple-touch-icon.png")
+@app.route("/apple-touch-icon-precomposed.png")
+def apple_touch_icon():
+    return Response(status=204)
 
 
 @app.route("/")
