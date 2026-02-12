@@ -5,7 +5,7 @@ import base64
 import re
 import gspread
 from google.oauth2.service_account import Credentials
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+from flask import Flask, render_template, request, redirect, url_for
 
 app = Flask(__name__)
 
@@ -15,9 +15,20 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ]
 
+# GCP鍵ファイルのパス (PythonAnywhere用)
+KEY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gcp_key.json")
+
+
 def get_sheet():
     """GCP認証してGoogle Sheetsに接続"""
-    raw = os.environ.get("GCP_JSON", "")
+    raw = None
+    # 1. ファイルから読む (PythonAnywhere)
+    if os.path.exists(KEY_FILE):
+        with open(KEY_FILE) as f:
+            raw = f.read()
+    # 2. 環境変数から読む (Render等)
+    if not raw:
+        raw = os.environ.get("GCP_JSON", "")
     if not raw:
         return None
 
@@ -48,12 +59,15 @@ def get_sheet():
 def index():
     sheet = get_sheet()
     rows = []
+    error = None
     if sheet:
         try:
             rows = sheet.get_all_records()
-        except Exception:
-            rows = []
-    return render_template("index.html", rows=rows)
+        except Exception as e:
+            error = str(e)
+    else:
+        error = "Google Sheetsに接続できません"
+    return render_template("index.html", rows=rows, error=error)
 
 
 @app.route("/add", methods=["POST"])
@@ -70,10 +84,50 @@ def add():
             sheet.append_row(["update", url, "HP更新", int(freq), "", ""])
     else:
         keyword = request.form.get("keyword", "").strip()
-        source = request.form.get("source", "x")
+        # source_type=custom の場合は custom_source を使う
+        source_type = request.form.get("source_type", "preset")
+        if source_type == "custom":
+            source = request.form.get("custom_source", "").strip()
+        else:
+            source = request.form.get("source", "x")
         freq = request.form.get("freq", "12")
-        if keyword:
+        if keyword and source:
             sheet.append_row([keyword, "", source, int(freq), "", ""])
+
+    return redirect(url_for("index"))
+
+
+@app.route("/edit", methods=["POST"])
+def edit():
+    sheet = get_sheet()
+    if not sheet:
+        return redirect(url_for("index"))
+
+    row_index = int(request.form.get("row_index", 0))
+    edit_mode = request.form.get("edit_mode", "")
+    freq = int(request.form.get("edit_freq", "12"))
+
+    if row_index < 2:
+        return redirect(url_for("index"))
+
+    try:
+        if edit_mode == "url":
+            new_url = request.form.get("edit_url", "").strip()
+            if new_url:
+                sheet.update_cell(row_index, 2, new_url)  # url列
+            sheet.update_cell(row_index, 4, freq)  # freq列
+        else:
+            new_word = request.form.get("edit_word", "").strip()
+            new_memo = request.form.get("edit_memo", "").strip()
+            if new_word:
+                sheet.update_cell(row_index, 1, new_word)  # word列
+            if new_memo:
+                sheet.update_cell(row_index, 3, new_memo)  # memo列
+                # memoが変わったらURLをリセット（Geminiに再生成させる）
+                sheet.update_cell(row_index, 2, "")
+            sheet.update_cell(row_index, 4, freq)  # freq列
+    except Exception:
+        pass
 
     return redirect(url_for("index"))
 
