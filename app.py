@@ -96,13 +96,34 @@ div[data-testid="stExpander"] {
 # ============================================================
 @st.cache_resource(ttl=300)
 def get_client():
+    # --- Secrets から鍵データを取得 ---
+    # 方法1: [gcp] セクションに各フィールドを直書き
+    if "gcp" in st.secrets and "private_key" in st.secrets["gcp"]:
+        try:
+            creds_dict = dict(st.secrets["gcp"])
+            scope = ["https://spreadsheets.google.com/feeds",
+                     "https://www.googleapis.com/auth/drive"]
+            creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+            return gspread.authorize(creds)
+        except Exception as e:
+            st.error(f"認証エラー(gcp): {e}")
+            return None
+
+    # 方法2: ENCODED_JSON (Base64)
     if "ENCODED_JSON" not in st.secrets:
+        st.error("Secretsに認証情報が設定されていません。")
         return None
     try:
-        encoded_raw = st.secrets["ENCODED_JSON"].strip().strip('"').strip("'")
-        clean_b64 = re.sub(r'[^A-Za-z0-9+/=]', '', encoded_raw)
+        raw = st.secrets["ENCODED_JSON"]
+        # TOMLのダブルクォートで \n が実改行になる場合があるので除去
+        clean_b64 = re.sub(r'[^A-Za-z0-9+/=]', '', raw)
+        # パディング補正
+        pad = len(clean_b64) % 4
+        if pad:
+            clean_b64 += '=' * (4 - pad)
         decoded_bytes = base64.b64decode(clean_b64)
         creds_dict = json.loads(decoded_bytes.decode("utf-8"))
+        # private_key 修復
         if "private_key" in creds_dict:
             pk = creds_dict["private_key"]
             if "\\n" in pk:
