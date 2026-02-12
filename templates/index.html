@@ -119,6 +119,17 @@
   .status-label { color: #aaa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
   .status-badge { font-size: 0.75rem; flex-shrink: 0; margin-left: 8px; }
 
+  /* --- カードURL表示 --- */
+  .card-url {
+    margin-top: 4px; font-size: 0.72rem; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+  .card-url a {
+    color: #4a90e2; text-decoration: none; opacity: 0.8;
+    transition: opacity 0.15s;
+  }
+  .card-url a:hover { opacity: 1; text-decoration: underline; }
+
   /* --- 空状態 --- */
   .empty { text-align: center; padding: 60px 20px; color: #444; }
   .empty-icon { font-size: 2.4rem; margin-bottom: 12px; }
@@ -267,6 +278,11 @@
         <div class="card-sub">
           {{ freq }}時間ごと{% if not is_url %} ・ {{ memo }}{% endif %}
         </div>
+        {% if not is_url and url.strip() %}
+        <div class="card-url" onclick="event.stopPropagation()">
+          <a href="{{ url }}" target="_blank" rel="noopener">{{ url[:60] }}{% if url|length > 60 %}...{% endif %}</a>
+        </div>
+        {% endif %}
       </div>
       <div class="card-actions" onclick="event.stopPropagation()">
         <form action="/delete/{{ i }}" method="post" style="margin:0"
