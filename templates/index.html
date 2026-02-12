@@ -254,7 +254,7 @@
     {% set word = row.get('word', '')|string %}
     {% set url = row.get('url', '')|string %}
     {% set memo = row.get('memo', '')|string %}
-    {% set freq = row.get('freq', '')|string %}
+    {% set freq = (row.get('count', '') or row.get('freq', ''))|string %}
     {% set prev_hash = row.get('prev_hash', '')|string %}
     {% set is_url = (memo == 'HP更新') %}
 

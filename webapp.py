@@ -109,22 +109,30 @@ def edit():
     if row_index < 2:
         return redirect(url_for("index"))
 
+    # ヘッダーから列番号を動的取得
+    headers = sheet.row_values(1)
+    col = {h: i + 1 for i, h in enumerate(headers)}
+
     try:
         if edit_mode == "url":
             new_url = request.form.get("edit_url", "").strip()
-            if new_url:
-                sheet.update_cell(row_index, 2, new_url)  # url列
-            sheet.update_cell(row_index, 4, freq)  # freq列
+            if new_url and 'url' in col:
+                sheet.update_cell(row_index, col['url'], new_url)
         else:
             new_word = request.form.get("edit_word", "").strip()
             new_memo = request.form.get("edit_memo", "").strip()
-            if new_word:
-                sheet.update_cell(row_index, 1, new_word)  # word列
-            if new_memo:
-                sheet.update_cell(row_index, 3, new_memo)  # memo列
+            if new_word and 'word' in col:
+                sheet.update_cell(row_index, col['word'], new_word)
+            if new_memo and 'memo' in col:
+                sheet.update_cell(row_index, col['memo'], new_memo)
                 # memoが変わったらURLをリセット（Geminiに再生成させる）
-                sheet.update_cell(row_index, 2, "")
-            sheet.update_cell(row_index, 4, freq)  # freq列
+                if 'url' in col:
+                    sheet.update_cell(row_index, col['url'], "")
+
+        # 頻度列（countまたはfreq）
+        freq_col = col.get('count') or col.get('freq')
+        if freq_col:
+            sheet.update_cell(row_index, freq_col, freq)
     except Exception:
         pass
 

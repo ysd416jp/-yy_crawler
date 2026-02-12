@@ -90,7 +90,15 @@ def extract_body_text(html):
     return soup.get_text(separator="\n", strip=True)
 
 
-def check_site_update(sheet, row_index, row):
+def get_col_index(headers, name):
+    """ヘッダー名から1-based列番号を取得"""
+    try:
+        return headers.index(name) + 1
+    except ValueError:
+        return None
+
+
+def check_site_update(sheet, row_index, row, col_map):
     """サイト更新チェック。軽微変更はスキップ、閾値超えたらLINE通知"""
     url = str(row.get('url', '')).strip()
     if not url.startswith('http'):
@@ -109,9 +117,14 @@ def check_site_update(sheet, row_index, row):
 
     prev_hash = str(row.get('prev_hash', '')).strip()
 
+    col_prev_hash = col_map.get('prev_hash')
+    col_prev_len = col_map.get('prev_len')
+
     if not prev_hash:
-        # 初回: ハッシュだけ保存して終了
-        sheet.update_cell(row_index, 5, current_hash)
+        if col_prev_hash:
+            sheet.update_cell(row_index, col_prev_hash, current_hash)
+        if col_prev_len:
+            sheet.update_cell(row_index, col_prev_len, str(len(current_text)))
         print(f"  行{row_index}: 初回チェック、ハッシュ保存")
         return
 
@@ -120,25 +133,19 @@ def check_site_update(sheet, row_index, row):
         return
 
     # --- 差分量を計算 ---
-    change_chars = abs(len(current_text) - len(prev_hash))  # 大まかな差分
-    # より正確にはdifflibを使うが、前回テキスト全文は保存していないので
-    # テキスト長の差で簡易判定する
-    total_chars = max(len(current_text), 1)
-
-    # 前回テキスト長は保存していないので、ハッシュが変わった＝何か変わった
-    # ここではテキスト長の変化だけでは不十分なので、常に通知する方針とし、
-    # 代わりにノイズ除去（script/style/nav等の除外）で軽微変更を減らす
-    # ただし初回以降は前回テキスト長を6列目に保存して比較する
     prev_len_str = str(row.get('prev_len', '')).strip()
+    change_chars = abs(len(current_text) - (int(prev_len_str) if prev_len_str.isdigit() else 0))
+
     if prev_len_str and prev_len_str.isdigit():
         prev_len = int(prev_len_str)
-        change_chars = abs(len(current_text) - prev_len)
         change_ratio = change_chars / max(prev_len, 1)
 
         if change_chars < MIN_CHANGE_CHARS and change_ratio < MIN_CHANGE_RATIO:
             print(f"  行{row_index}: 軽微変更（{change_chars}文字, {change_ratio:.1%}）スキップ")
-            sheet.update_cell(row_index, 5, current_hash)
-            sheet.update_cell(row_index, 6, str(len(current_text)))
+            if col_prev_hash:
+                sheet.update_cell(row_index, col_prev_hash, current_hash)
+            if col_prev_len:
+                sheet.update_cell(row_index, col_prev_len, str(len(current_text)))
             return
 
     # --- 通知 ---
@@ -147,12 +154,13 @@ def check_site_update(sheet, row_index, row):
     send_line_notification(msg)
     print(f"  行{row_index}: 更新検知 → LINE通知")
 
-    # ハッシュとテキスト長を更新
-    sheet.update_cell(row_index, 5, current_hash)
-    sheet.update_cell(row_index, 6, str(len(current_text)))
+    if col_prev_hash:
+        sheet.update_cell(row_index, col_prev_hash, current_hash)
+    if col_prev_len:
+        sheet.update_cell(row_index, col_prev_len, str(len(current_text)))
 
 
-def generate_search_url(sheet, row_index, row, gemini_model):
+def generate_search_url(sheet, row_index, row, gemini_model, col_map):
     """キーワード検索URL生成（テンプレート優先、未知サイトはGemini）"""
     url_cell = str(row.get('url', '')).strip()
     if url_cell.startswith('http'):
@@ -160,6 +168,7 @@ def generate_search_url(sheet, row_index, row, gemini_model):
 
     word = str(row.get('word', '')).strip()
     memo = str(row.get('memo', '')).strip().lower()
+    col_url = col_map.get('url', 2)
 
     if not word:
         return
@@ -167,7 +176,7 @@ def generate_search_url(sheet, row_index, row, gemini_model):
     # テンプレートにあるサイトはそれを使う
     if memo in SEARCH_TEMPLATES:
         new_url = SEARCH_TEMPLATES[memo].format(word=quote(word))
-        sheet.update_cell(row_index, 2, new_url)
+        sheet.update_cell(row_index, col_url, new_url)
         print(f"  行{row_index}: テンプレートURL生成 → {new_url}")
         return
 
@@ -183,10 +192,22 @@ def generate_search_url(sheet, row_index, row, gemini_model):
         )
         res = gemini_model.generate_content(prompt)
         new_url = res.text.strip()
-        sheet.update_cell(row_index, 2, new_url)
+        sheet.update_cell(row_index, col_url, new_url)
         print(f"  行{row_index}: Gemini URL生成 → {new_url}")
     except Exception as e:
         print(f"  行{row_index}: Gemini生成エラー: {e}")
+
+
+def should_run_now(row, current_hour):
+    """頻度設定に基づいて今実行すべきかを判定"""
+    freq_key = 'count' if 'count' in row else 'freq'
+    try:
+        freq = int(row.get(freq_key, 1))
+    except (ValueError, TypeError):
+        freq = 1
+    if freq <= 0:
+        freq = 1
+    return (current_hour % freq) == 0
 
 
 def main():
@@ -198,14 +219,22 @@ def main():
         sheet = client.open_by_key("1wSfyGreLH_lb7vR_vpmuJ3rAndtMNvMDQbv2ZlPVxUE").sheet1
         print("認証成功")
 
-        # ヘッダーにprev_hash, prev_lenがなければ自動追加
+        # ヘッダー取得 & 列マップ作成
         headers = sheet.row_values(1)
-        if "prev_hash" not in headers:
-            sheet.update_cell(1, len(headers) + 1, "prev_hash")
+        col_map = {h: i + 1 for i, h in enumerate(headers)}
+        print(f"ヘッダー: {headers}")
+
+        # prev_hash, prev_lenがなければ自動追加
+        if "prev_hash" not in col_map:
+            idx = len(headers) + 1
+            sheet.update_cell(1, idx, "prev_hash")
+            col_map["prev_hash"] = idx
             headers.append("prev_hash")
             print("ヘッダーに prev_hash を追加")
-        if "prev_len" not in headers:
-            sheet.update_cell(1, len(headers) + 1, "prev_len")
+        if "prev_len" not in col_map:
+            idx = len(headers) + 1
+            sheet.update_cell(1, idx, "prev_len")
+            col_map["prev_len"] = idx
             headers.append("prev_len")
             print("ヘッダーに prev_len を追加")
 
@@ -216,16 +245,23 @@ def main():
             genai.configure(api_key=gemini_key)
             gemini_model = genai.GenerativeModel('gemini-3-pro-preview')
 
+        # 現在の時刻（UTC）
+        from datetime import datetime, timezone
+        current_hour = datetime.now(timezone.utc).hour
+
         rows = sheet.get_all_records()
         for i, row in enumerate(rows, start=2):
             memo = str(row.get('memo', '')).strip()
 
+            # 頻度チェック
+            if not should_run_now(row, current_hour):
+                print(f"  行{i}: 頻度スキップ")
+                continue
+
             if memo == "HP更新":
-                # サイト更新チェック
-                check_site_update(sheet, i, row)
+                check_site_update(sheet, i, row, col_map)
             else:
-                # キーワード検索URL生成
-                generate_search_url(sheet, i, row, gemini_model)
+                generate_search_url(sheet, i, row, gemini_model, col_map)
 
         print("--- 全処理完了 ---")
 
