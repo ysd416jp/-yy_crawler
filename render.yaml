@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: webwatch
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn webapp:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: GCP_JSON
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.11.0"

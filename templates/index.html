@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Web更新チェッカー</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0e1117; color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', sans-serif;
+    min-height: 100vh; padding: 24px 16px;
+  }
+  .container { max-width: 640px; margin: 0 auto; }
+
+  /* --- ヘッダー --- */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .header h1 { font-size: 1.4rem; font-weight: 700; color: #fff; }
+  .header-actions { display: flex; gap: 8px; }
+  .icon-btn {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: #1a1d24; border: 1px solid #2a2d35;
+    color: #aaa; font-size: 16px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .icon-btn:hover { background: #24272e; color: #fff; }
+
+  /* --- 追加ボタン --- */
+  .add-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 24px; }
+  .add-btn {
+    padding: 12px 0; border: none; border-radius: 10px;
+    font-size: 0.92rem; font-weight: 600; cursor: pointer;
+    color: #fff; transition: all 0.15s;
+  }
+  .add-btn:hover { transform: translateY(-1px); filter: brightness(1.15); }
+  .add-btn-url { background: linear-gradient(135deg, #1a5c3a, #238b5e); }
+  .add-btn-kw  { background: linear-gradient(135deg, #1a3d5c, #2370a0); }
+
+  /* --- モーダル --- */
+  .modal-overlay {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.6); z-index: 100;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: #1a1d24; border-radius: 14px; padding: 28px;
+    width: 90%; max-width: 420px; border: 1px solid #2a2d35;
+  }
+  .modal h2 { font-size: 1.1rem; margin-bottom: 18px; color: #fff; }
+  .modal label { display: block; font-size: 0.8rem; color: #888; margin-bottom: 6px; margin-top: 14px; }
+  .modal input, .modal select {
+    width: 100%; padding: 10px 12px; border-radius: 8px;
+    background: #0e1117; border: 1px solid #2a2d35; color: #e0e0e0;
+    font-size: 0.9rem; outline: none; transition: border 0.15s;
+  }
+  .modal input:focus, .modal select:focus { border-color: #4a90e2; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 22px; }
+  .btn-submit {
+    flex: 1; padding: 10px; border: none; border-radius: 8px;
+    background: #238b5e; color: #fff; font-weight: 600; font-size: 0.9rem;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .btn-submit:hover { background: #2aa06e; }
+  .btn-cancel {
+    padding: 10px 18px; border: 1px solid #333; border-radius: 8px;
+    background: transparent; color: #999; cursor: pointer; font-size: 0.9rem;
+  }
+  .btn-cancel:hover { background: #1e2028; color: #ccc; }
+
+  /* --- セクション見出し --- */
+  .section-title {
+    font-size: 0.78rem; color: #666; font-weight: 600;
+    letter-spacing: 0.04em; margin-bottom: 10px;
+  }
+
+  /* --- カード --- */
+  .card {
+    background: #1a1d24; border-radius: 10px; padding: 14px 16px;
+    margin-bottom: 8px; display: flex; align-items: center;
+    border: 1px solid #2a2d35; transition: border 0.15s;
+  }
+  .card:hover { border-color: #3a3d45; }
+  .card-icon {
+    width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; margin-right: 14px; flex-shrink: 0;
+  }
+  .card-icon-url { background: #1a3d2a; }
+  .card-icon-kw  { background: #1a2d4a; }
+  .card-body { flex: 1; min-width: 0; }
+  .card-title {
+    font-size: 0.92rem; color: #fff; font-weight: 500;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .card-sub { font-size: 0.73rem; color: #666; margin-top: 2px; }
+  .card-actions { display: flex; gap: 6px; flex-shrink: 0; margin-left: 10px; }
+  .card-btn {
+    width: 32px; height: 32px; border-radius: 6px;
+    background: transparent; border: 1px solid #2a2d35;
+    color: #555; font-size: 14px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .card-btn:hover { background: #2a1a1a; border-color: #6a3030; color: #e05050; }
+
+  /* --- ステータス --- */
+  .status-list { margin-top: 24px; }
+  .status-row {
+    background: #14161c; border-radius: 6px; padding: 9px 14px;
+    margin-bottom: 4px; font-size: 0.8rem; color: #777;
+    border-left: 3px solid #2a2d35;
+    display: flex; justify-content: space-between;
+  }
+  .status-ok { border-left-color: #238b5e; }
+  .status-wait { border-left-color: #4a4a20; }
+  .status-label { color: #aaa; }
+  .status-badge { font-size: 0.75rem; }
+
+  /* --- 空状態 --- */
+  .empty {
+    text-align: center; padding: 60px 20px; color: #444;
+  }
+  .empty-icon { font-size: 2.4rem; margin-bottom: 12px; }
+  .empty-text { font-size: 0.9rem; }
+
+  /* --- フッター --- */
+  .footer { text-align: right; color: #333; font-size: 0.68rem; margin-top: 40px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <h1>Web更新チェッカー</h1>
+    <div class="header-actions">
+      <button class="icon-btn" onclick="location.reload()" title="更新">&#x21bb;</button>
+    </div>
+  </div>
+
+  <!-- 追加ボタン -->
+  <div class="add-buttons">
+    <button class="add-btn add-btn-url" onclick="openModal('url')">＋ &#x1F310; URL監視</button>
+    <button class="add-btn add-btn-kw"  onclick="openModal('kw')">＋ &#x1F50D; 検索監視</button>
+  </div>
+
+  <!-- モーダル: URL監視 -->
+  <div class="modal-overlay" id="modal-url">
+    <div class="modal">
+      <h2>&#x1F310; URL監視を追加</h2>
+      <form action="/add" method="post">
+        <input type="hidden" name="mode" value="url">
+        <label>監視するURL</label>
+        <input type="url" name="url" placeholder="https://example.com" required>
+        <label>チェック間隔</label>
+        <select name="freq">
+          <option value="1">1時間ごと</option>
+          <option value="4">4時間ごと</option>
+          <option value="6" selected>6時間ごと</option>
+          <option value="12">12時間ごと</option>
+          <option value="24">24時間ごと</option>
+        </select>
+        <div class="modal-actions">
+          <button type="button" class="btn-cancel" onclick="closeModal('url')">キャンセル</button>
+          <button type="submit" class="btn-submit">追加する</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- モーダル: 検索監視 -->
+  <div class="modal-overlay" id="modal-kw">
+    <div class="modal">
+      <h2>&#x1F50D; 検索監視を追加</h2>
+      <form action="/add" method="post">
+        <input type="hidden" name="mode" value="kw">
+        <label>検索キーワード</label>
+        <input type="text" name="keyword" placeholder="キーワードを入力" required>
+        <label>検索先</label>
+        <select name="source">
+          <option value="x">X (Twitter)</option>
+          <option value="indeed">Indeed</option>
+          <option value="townwork">タウンワーク</option>
+          <option value="jalan">じゃらん</option>
+          <option value="hotpepper">ホットペッパー</option>
+          <option value="google">Google</option>
+        </select>
+        <label>チェック間隔</label>
+        <select name="freq">
+          <option value="1">1時間ごと</option>
+          <option value="4">4時間ごと</option>
+          <option value="6" selected>6時間ごと</option>
+          <option value="12">12時間ごと</option>
+          <option value="24">24時間ごと</option>
+        </select>
+        <div class="modal-actions">
+          <button type="button" class="btn-cancel" onclick="closeModal('kw')">キャンセル</button>
+          <button type="submit" class="btn-submit">追加する</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 監視一覧 -->
+  {% if rows %}
+  <div class="section-title">監視中 ({{ rows|length }}件)</div>
+  {% for row in rows %}
+    {% set i = loop.index + 1 %}
+    {% set word = row.get('word', '')|string %}
+    {% set url = row.get('url', '')|string %}
+    {% set memo = row.get('memo', '')|string %}
+    {% set freq = row.get('freq', '')|string %}
+    {% set prev_hash = row.get('prev_hash', '')|string %}
+    {% set is_url = (memo == 'HP更新') %}
+
+    <div class="card">
+      <div class="card-icon {{ 'card-icon-url' if is_url else 'card-icon-kw' }}">
+        {{ '&#x1F310;' if is_url else '&#x1F50D;' }}
+      </div>
+      <div class="card-body">
+        <div class="card-title">{{ url if is_url and url else word }}</div>
+        <div class="card-sub">
+          {{ freq }}時間ごと{% if not is_url %} ・ {{ memo }}{% endif %}
+        </div>
+      </div>
+      <div class="card-actions">
+        <form action="/delete/{{ i }}" method="post" style="margin:0"
+              onsubmit="return confirm('削除しますか？')">
+          <button type="submit" class="card-btn" title="削除">&#x1F5D1;</button>
+        </form>
+      </div>
+    </div>
+  {% endfor %}
+
+  <!-- ステータス -->
+  <div class="status-list">
+    <div class="section-title">ステータス</div>
+    {% for row in rows %}
+      {% set word = row.get('word', '')|string %}
+      {% set url = row.get('url', '')|string %}
+      {% set memo = row.get('memo', '')|string %}
+      {% set prev_hash = row.get('prev_hash', '')|string %}
+      {% set is_url = (memo == 'HP更新') %}
+      {% if is_url %}
+        {% set label = url[:40] if url else word %}
+        {% if prev_hash.strip() %}
+          <div class="status-row status-ok">
+            <span class="status-label">{{ label }}</span>
+            <span class="status-badge">&#x2705; 監視中</span>
+          </div>
+        {% else %}
+          <div class="status-row status-wait">
+            <span class="status-label">{{ label }}</span>
+            <span class="status-badge">&#x23F3; 初回待ち</span>
+          </div>
+        {% endif %}
+      {% else %}
+        {% set label = word %}
+        {% if url.strip() %}
+          <div class="status-row status-ok">
+            <span class="status-label">{{ label }}</span>
+            <span class="status-badge">&#x2705; URL生成済</span>
+          </div>
+        {% else %}
+          <div class="status-row status-wait">
+            <span class="status-label">{{ label }}</span>
+            <span class="status-badge">&#x23F3; URL未生成</span>
+          </div>
+        {% endif %}
+      {% endif %}
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="empty">
+    <div class="empty-icon">&#x1F4E1;</div>
+    <div class="empty-text">監視項目がありません<br>上のボタンから追加してください</div>
+  </div>
+  {% endif %}
+
+  <div class="footer">v5.0.0</div>
+</div>
+
+<script>
+function openModal(type) {
+  document.getElementById('modal-' + type).classList.add('active');
+}
+function closeModal(type) {
+  document.getElementById('modal-' + type).classList.remove('active');
+}
+// オーバーレイクリックで閉じる
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => {
+    if (e.target === el) el.classList.remove('active');
+  });
+});
+</script>
+</body>
+</html>
