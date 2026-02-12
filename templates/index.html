@@ -240,6 +240,12 @@
           <input type="text" name="edit_word" id="edit-word">
           <label>検索先</label>
           <input type="text" name="edit_memo" id="edit-memo">
+          <div id="edit-generated-url" style="display:none; margin-top:12px;">
+            <label>生成済みURL</label>
+            <div style="background:#0e1117; border:1px solid #2a2d35; border-radius:8px; padding:10px 12px; word-break:break-all;">
+              <a id="edit-gen-url-link" href="#" target="_blank" rel="noopener" style="color:#4a90e2; font-size:0.82rem; text-decoration:none;">—</a>
+            </div>
+          </div>
         </div>
 
         <label>チェック間隔</label>
@@ -379,6 +385,19 @@ function openEdit(rowIndex, mode, word, url, memo, freq) {
     document.getElementById('edit-kw-fields').style.display = 'block';
     document.getElementById('edit-word').value = word;
     document.getElementById('edit-memo').value = memo;
+    // 生成済みURL表示
+    var genUrlDiv = document.getElementById('edit-generated-url');
+    var genUrlLink = document.getElementById('edit-gen-url-link');
+    if (url && url.trim()) {
+      genUrlDiv.style.display = 'block';
+      genUrlLink.href = url;
+      genUrlLink.textContent = url;
+    } else {
+      genUrlDiv.style.display = 'block';
+      genUrlLink.href = '#';
+      genUrlLink.textContent = '⏳ 未生成（次回cron実行時にGeminiが生成します）';
+      genUrlLink.style.pointerEvents = 'none';
+    }
   }
   openModal('edit');
 }
