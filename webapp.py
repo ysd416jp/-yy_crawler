@@ -113,7 +113,19 @@ def index():
     error = None
     if sheet:
         try:
+            headers = sheet.row_values(1)
+            col = {h: i + 1 for i, h in enumerate(headers)}
             rows = sheet.get_all_records()
+            # URL未生成の検索監視があれば自動生成
+            for i, row in enumerate(rows, start=2):
+                memo = str(row.get('memo', '')).strip()
+                url = str(row.get('url', '')).strip()
+                word = str(row.get('word', '')).strip()
+                if memo != "HP更新" and not url.startswith('http') and word and memo:
+                    generated = generate_url_now(word, memo)
+                    if generated and 'url' in col:
+                        sheet.update_cell(i, col['url'], generated)
+                        row['url'] = generated
         except Exception as e:
             error = str(e)
     else:
