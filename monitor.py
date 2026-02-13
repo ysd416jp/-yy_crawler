@@ -155,8 +155,13 @@ def check_site_update(sheet, row_index, row, col_map):
                 return
 
     # --- 通知 ---
-    word = row.get('word', '')
-    msg = f"🔔 サイト更新検知\n{word}\n変更量: 約{change_chars}文字\n{url}"
+    word = str(row.get('word', ''))
+    memo = str(row.get('memo', ''))
+    if memo == "HP更新":
+        label = url
+    else:
+        label = f"{word}（{memo}）"
+    msg = f"🔔 サイト更新検知\n{label}\n{url}"
     send_line_notification(msg)
     print(f"  行{row_index}: 更新検知 → LINE通知")
 
