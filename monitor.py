@@ -6,55 +6,27 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import quote
 
-# --- 検索URLテンプレート（既知サイトはGemini不要） ---
-# キー: 日本語名・英語名・略称など複数登録して柔軟にマッチ
-SEARCH_TEMPLATES = {
-    # グルメ
-    "食べログ":           "https://tabelog.com/keywords/{word}/kwdLst/",
-    "tabelog":            "https://tabelog.com/keywords/{word}/kwdLst/",
-    "ホットペッパーグルメ": "https://www.hotpepper.jp/CSP/psh/rstLst/00/?keyword={word}",
-    "ホットペッパー":      "https://www.hotpepper.jp/CSP/psh/rstLst/00/?keyword={word}",
-    "hotpepper":          "https://www.hotpepper.jp/CSP/psh/rstLst/00/?keyword={word}",
-    "ぐるなび":           "https://r.gnavi.co.jp/eki/result/?freeword={word}",
-    "gnavi":              "https://r.gnavi.co.jp/eki/result/?freeword={word}",
-    "retty":              "https://retty.me/search/?keyword={word}",
-    # 旅行・宿泊
-    "jalan":              "https://www.jalan.net/uw/uwp3200/uww3201init.do?keyword={word}",
-    "じゃらん":           "https://www.jalan.net/uw/uwp3200/uww3201init.do?keyword={word}",
-    "楽天トラベル":        "https://search.travel.rakuten.co.jp/ds/hotellist/search?f_free_word={word}",
-    "rakuten travel":     "https://search.travel.rakuten.co.jp/ds/hotellist/search?f_free_word={word}",
-    "booking.com":        "https://www.booking.com/searchresults.html?ss={word}",
-    "booking":            "https://www.booking.com/searchresults.html?ss={word}",
-    # 求人
-    "indeed":             "https://jp.indeed.com/jobs?q={word}",
-    "townwork":           "https://townwork.net/joSrchRsltList/?fw={word}",
-    "タウンワーク":        "https://townwork.net/joSrchRsltList/?fw={word}",
-    "リクナビnext":       "https://next.rikunabi.com/search/?freeWordKey={word}",
-    "マイナビ転職":        "https://tenshoku.mynavi.jp/list/kw{word}/",
-    "doda":               "https://doda.jp/keyword/{word}/",
-    # SNS・検索
-    "x":                  "https://x.com/search?q={word}",
-    "twitter":            "https://x.com/search?q={word}",
-    "youtube":            "https://www.youtube.com/results?search_query={word}",
-    "google":             "https://www.google.com/search?q={word}",
-    "bing":               "https://www.bing.com/search?q={word}",
-    # ショッピング
-    "amazon":             "https://www.amazon.co.jp/s?k={word}",
-    "アマゾン":           "https://www.amazon.co.jp/s?k={word}",
-    "楽天市場":           "https://search.rakuten.co.jp/search/mall/{word}/",
-    "rakuten":            "https://search.rakuten.co.jp/search/mall/{word}/",
-    "メルカリ":           "https://jp.mercari.com/search?keyword={word}",
-    "mercari":            "https://jp.mercari.com/search?keyword={word}",
-    "yahoo!ショッピング":  "https://shopping.yahoo.co.jp/search?p={word}",
-    "yahooショッピング":   "https://shopping.yahoo.co.jp/search?p={word}",
-    # 不動産
-    "suumo":              "https://suumo.jp/jj/common/ichiran/JJ010FJ001/?fw={word}",
-    "スーモ":             "https://suumo.jp/jj/common/ichiran/JJ010FJ001/?fw={word}",
-    "homes":              "https://www.homes.co.jp/chintai/theme/keyword={word}/",
-    # ニュース
-    "yahoo!ニュース":      "https://news.yahoo.co.jp/search?p={word}",
-    "yahooニュース":       "https://news.yahoo.co.jp/search?p={word}",
-    "nhk":                "https://www3.nhk.or.jp/news/json/search/2.0/search.json?q={word}",
+# --- サイト名→ドメイン名の対応表（webapp.pyと共通） ---
+SITE_DOMAINS = {
+    "x": None, "twitter": None, "youtube": None, "google": None,
+    "食べログ": "tabelog.com", "tabelog": "tabelog.com",
+    "ホットペッパーグルメ": "hotpepper.jp", "ホットペッパー": "hotpepper.jp", "hotpepper": "hotpepper.jp",
+    "ぐるなび": "gnavi.co.jp", "gnavi": "gnavi.co.jp", "retty": "retty.me",
+    "jalan": "jalan.net", "じゃらん": "jalan.net",
+    "楽天トラベル": "travel.rakuten.co.jp", "booking.com": "booking.com", "booking": "booking.com",
+    "indeed": "indeed.com", "townwork": "townwork.net", "タウンワーク": "townwork.net",
+    "リクナビnext": "next.rikunabi.com", "マイナビ転職": "tenshoku.mynavi.jp", "doda": "doda.jp",
+    "amazon": "amazon.co.jp", "アマゾン": "amazon.co.jp",
+    "楽天市場": "rakuten.co.jp", "rakuten": "rakuten.co.jp",
+    "メルカリ": "mercari.com", "mercari": "mercari.com",
+    "yahoo!ショッピング": "shopping.yahoo.co.jp", "yahooショッピング": "shopping.yahoo.co.jp",
+    "suumo": "suumo.jp", "スーモ": "suumo.jp", "homes": "homes.co.jp",
+    "yahoo!ニュース": "news.yahoo.co.jp", "yahooニュース": "news.yahoo.co.jp", "nhk": "www3.nhk.or.jp",
+}
+DIRECT_TEMPLATES = {
+    "x": "https://x.com/search?q={word}", "twitter": "https://x.com/search?q={word}",
+    "youtube": "https://www.youtube.com/results?search_query={word}",
+    "google": "https://www.google.com/search?q={word}",
 }
 
 # --- 軽微変更の閾値 (大規模サイトのみ適用) ---
@@ -213,21 +185,33 @@ def check_site_update(sheet, row_index, row, col_map):
         sheet.update_cell(row_index, col_prev_len, str(current_len))
 
 
-def find_template(memo):
-    """メモからテンプレートを検索（完全一致→部分一致）"""
-    memo_clean = memo.strip().lower()
-    # 完全一致
-    if memo_clean in SEARCH_TEMPLATES:
-        return SEARCH_TEMPLATES[memo_clean]
-    # 部分一致（テンプレートキーがメモに含まれる or メモがキーに含まれる）
-    for key, tmpl in SEARCH_TEMPLATES.items():
-        if key in memo_clean or memo_clean in key:
-            return tmpl
-    return None
+def generate_search_url_str(word, memo):
+    """検索URLを生成（汎用: Google検索+site:ドメイン）"""
+    memo_lower = memo.strip().lower()
+
+    # 1. 確実に動くサイト内検索（X, YouTube, Google）
+    if memo_lower in DIRECT_TEMPLATES:
+        return DIRECT_TEMPLATES[memo_lower].format(word=quote(word))
+
+    # 2. ドメイン対応表にあるサイト → Google site:検索
+    domain = None
+    if memo_lower in SITE_DOMAINS:
+        domain = SITE_DOMAINS[memo_lower]
+    else:
+        for key, d in SITE_DOMAINS.items():
+            if key in memo_lower or memo_lower in key:
+                domain = d
+                break
+
+    if domain:
+        return f"https://www.google.com/search?q={quote(word)}+site%3A{domain}"
+
+    # 3. 未知サイト → Google検索「キーワード サイト名」
+    return f"https://www.google.com/search?q={quote(word)}+{quote(memo)}"
 
 
 def generate_search_url(sheet, row_index, row, gemini_model, col_map):
-    """キーワード検索URL生成（テンプレート優先、未知サイトはGemini）"""
+    """キーワード検索URL生成してシートに書き込み"""
     url_cell = str(row.get('url', '')).strip()
     if url_cell.startswith('http'):
         return  # 既にURLあり
@@ -239,30 +223,9 @@ def generate_search_url(sheet, row_index, row, gemini_model, col_map):
     if not word:
         return
 
-    # テンプレートにあるサイトはそれを使う
-    tmpl = find_template(memo)
-    if tmpl:
-        new_url = tmpl.format(word=quote(word))
-        sheet.update_cell(row_index, col_url, new_url)
-        print(f"  行{row_index}: テンプレートURL生成 → {new_url}")
-        return
-
-    # 未知サイトはGeminiにフォールバック
-    if not gemini_model:
-        print(f"  行{row_index}: Gemini未設定、スキップ")
-        return
-
-    try:
-        prompt = (
-            f"「{memo}」のサイト内検索で「{word}」を検索した結果ページのURLを"
-            f"1つだけ出力してください。URLのみを出力し、説明は不要です。"
-        )
-        res = gemini_model.generate_content(prompt)
-        new_url = res.text.strip()
-        sheet.update_cell(row_index, col_url, new_url)
-        print(f"  行{row_index}: Gemini URL生成 → {new_url}")
-    except Exception as e:
-        print(f"  行{row_index}: Gemini生成エラー: {e}")
+    new_url = generate_search_url_str(word, memo)
+    sheet.update_cell(row_index, col_url, new_url)
+    print(f"  行{row_index}: URL生成 → {new_url}")
 
 
 def should_run_now(row, current_hour):
