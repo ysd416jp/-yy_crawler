@@ -10,8 +10,8 @@ from urllib.parse import quote
 # キー: 日本語名・英語名・略称など複数登録して柔軟にマッチ
 SEARCH_TEMPLATES = {
     # グルメ
-    "食べログ":           "https://tabelog.com/rstLst/?vs=1&sa=&sk={word}",
-    "tabelog":            "https://tabelog.com/rstLst/?vs=1&sa=&sk={word}",
+    "食べログ":           "https://tabelog.com/keywords/{word}/kwdLst/",
+    "tabelog":            "https://tabelog.com/keywords/{word}/kwdLst/",
     "ホットペッパーグルメ": "https://www.hotpepper.jp/CSP/psh/rstLst/00/?keyword={word}",
     "ホットペッパー":      "https://www.hotpepper.jp/CSP/psh/rstLst/00/?keyword={word}",
     "hotpepper":          "https://www.hotpepper.jp/CSP/psh/rstLst/00/?keyword={word}",
