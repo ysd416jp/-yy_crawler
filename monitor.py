@@ -185,15 +185,50 @@ def check_site_update(sheet, row_index, row, col_map):
         sheet.update_cell(row_index, col_prev_len, str(current_len))
 
 
-def generate_search_url_str(word, memo):
-    """検索URLを生成（汎用: Google検索+site:ドメイン）"""
-    memo_lower = memo.strip().lower()
+def generate_search_url(sheet, row_index, row, gemini_model, col_map):
+    """キーワード検索URL生成してシートに書き込み（Gemini優先）"""
+    url_cell = str(row.get('url', '')).strip()
+    word = str(row.get('word', '')).strip()
+    memo = str(row.get('memo', '')).strip()
+    memo_lower = memo.lower()
+    col_url = col_map.get('url', 2)
 
-    # 1. 確実に動くサイト内検索（X, YouTube, Google）
+    if not word:
+        return
+
+    # 既に正式URL（非Google経由）があればスキップ
+    if url_cell.startswith('http') and 'google.com/search' not in url_cell:
+        return
+
+    # 1. X/YouTube/Googleは確実なので直接テンプレート
     if memo_lower in DIRECT_TEMPLATES:
-        return DIRECT_TEMPLATES[memo_lower].format(word=quote(word))
+        new_url = DIRECT_TEMPLATES[memo_lower].format(word=quote(word))
+        sheet.update_cell(row_index, col_url, new_url)
+        print(f"  行{row_index}: テンプレートURL → {new_url}")
+        return
 
-    # 2. ドメイン対応表にあるサイト → Google site:検索
+    # 2. Geminiで「そのサイトの検索窓で検索したURL」を生成
+    if gemini_model:
+        try:
+            prompt = (
+                f"「{memo}」というサイトで「{word}」を検索した結果ページのURLを"
+                f"1つだけ出力してください。\n"
+                f"そのサイトの検索機能を使った実際のURLを出力してください。\n"
+                f"URLのみを出力し、説明は不要です。"
+            )
+            res = gemini_model.generate_content(prompt)
+            new_url = res.text.strip()
+            # URLとして妥当か簡易チェック
+            if new_url.startswith('http') and ' ' not in new_url and len(new_url) < 500:
+                sheet.update_cell(row_index, col_url, new_url)
+                print(f"  行{row_index}: Gemini URL生成 → {new_url}")
+                return
+            else:
+                print(f"  行{row_index}: Gemini応答が不正URL: {new_url[:100]}")
+        except Exception as e:
+            print(f"  行{row_index}: Gemini生成エラー: {e}")
+
+    # 3. Gemini失敗時のフォールバック: Google site:検索（仮URL）
     domain = None
     if memo_lower in SITE_DOMAINS:
         domain = SITE_DOMAINS[memo_lower]
@@ -204,28 +239,16 @@ def generate_search_url_str(word, memo):
                 break
 
     if domain:
-        return f"https://www.google.com/search?q={quote(word)}+site%3A{domain}"
+        fallback = f"https://www.google.com/search?q={quote(word)}+site%3A{domain}"
+    else:
+        fallback = f"https://www.google.com/search?q={quote(word)}+{quote(memo)}"
 
-    # 3. 未知サイト → Google検索「キーワード サイト名」
-    return f"https://www.google.com/search?q={quote(word)}+{quote(memo)}"
-
-
-def generate_search_url(sheet, row_index, row, gemini_model, col_map):
-    """キーワード検索URL生成してシートに書き込み"""
-    url_cell = str(row.get('url', '')).strip()
-    if url_cell.startswith('http'):
-        return  # 既にURLあり
-
-    word = str(row.get('word', '')).strip()
-    memo = str(row.get('memo', '')).strip()
-    col_url = col_map.get('url', 2)
-
-    if not word:
-        return
-
-    new_url = generate_search_url_str(word, memo)
-    sheet.update_cell(row_index, col_url, new_url)
-    print(f"  行{row_index}: URL生成 → {new_url}")
+    # 既にGoogle検索URLが入っていれば上書きしない（次回Geminiリトライ用）
+    if not url_cell.startswith('http'):
+        sheet.update_cell(row_index, col_url, fallback)
+        print(f"  行{row_index}: 仮URL(Google) → {fallback}")
+    else:
+        print(f"  行{row_index}: Gemini失敗、既存仮URLを維持")
 
 
 def should_run_now(row, current_hour):
@@ -283,12 +306,15 @@ def main():
         for i, row in enumerate(rows, start=2):
             memo = str(row.get('memo', '')).strip()
 
-            # URL未生成の検索監視は頻度に関係なく常に生成を試みる
+            # URL未生成 or 仮URL（Google経由）の検索監視 → Geminiで正式URL生成
             if memo != "HP更新":
                 url_cell = str(row.get('url', '')).strip()
-                if not url_cell.startswith('http'):
+                if not url_cell.startswith('http') or 'google.com/search' in url_cell:
                     generate_search_url(sheet, i, row, gemini_model, col_map)
-                    continue
+                    if 'google.com/search' in str(row.get('url', '')):
+                        continue  # 仮URLのままなら更新チェックもスキップ
+                    if not str(row.get('url', '')).strip().startswith('http'):
+                        continue
 
             # 頻度チェック（URL生成済みの監視・HP更新のみ）
             if not should_run_now(row, current_hour):

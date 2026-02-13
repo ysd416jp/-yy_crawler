@@ -324,10 +324,15 @@
         {% endif %}
       {% else %}
         {% set label = word %}
-        {% if url.strip() %}
+        {% if url.strip() and 'google.com/search' not in url %}
           <div class="status-row status-ok">
             <span class="status-label">{{ label }}</span>
             <span class="status-badge">✅ URL生成済</span>
+          </div>
+        {% elif url.strip() and 'google.com/search' in url %}
+          <div class="status-row status-wait">
+            <span class="status-label">{{ label }}</span>
+            <span class="status-badge">🔄 Gemini生成待ち</span>
           </div>
         {% else %}
           <div class="status-row status-wait">
@@ -388,15 +393,24 @@ function openEdit(rowIndex, mode, word, url, memo, freq) {
     // 生成済みURL表示
     var genUrlDiv = document.getElementById('edit-generated-url');
     var genUrlLink = document.getElementById('edit-gen-url-link');
-    if (url && url.trim()) {
+    if (url && url.trim() && url.indexOf('google.com/search') === -1) {
       genUrlDiv.style.display = 'block';
       genUrlLink.href = url;
       genUrlLink.textContent = url;
+      genUrlLink.style.pointerEvents = '';
+      genUrlLink.style.color = '#4a90e2';
+    } else if (url && url.trim() && url.indexOf('google.com/search') !== -1) {
+      genUrlDiv.style.display = 'block';
+      genUrlLink.href = url;
+      genUrlLink.textContent = '🔄 仮URL（次回cronでGeminiが正式URLを生成します）';
+      genUrlLink.style.pointerEvents = '';
+      genUrlLink.style.color = '#b0a030';
     } else {
       genUrlDiv.style.display = 'block';
       genUrlLink.href = '#';
       genUrlLink.textContent = '⏳ 未生成（次回cron実行時にGeminiが生成します）';
       genUrlLink.style.pointerEvents = 'none';
+      genUrlLink.style.color = '#888';
     }
   }
   openModal('edit');
