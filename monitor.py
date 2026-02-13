@@ -15,9 +15,12 @@ SEARCH_TEMPLATES = {
     "x":         "https://x.com/search?q={word}",
 }
 
-# --- 軽微変更の閾値 ---
+# --- 軽微変更の閾値 (大規模サイトのみ適用) ---
 MIN_CHANGE_CHARS = 50
 MIN_CHANGE_RATIO = 0.05
+# テキスト量がこの値以下なら軽微変更フィルタを無効にする
+# (ニュースサイトのトップ等、テキスト量が少ないがコンテンツが入れ替わるもの)
+SMALL_PAGE_THRESHOLD = 5000
 
 
 def get_credentials():
@@ -134,19 +137,22 @@ def check_site_update(sheet, row_index, row, col_map):
 
     # --- 差分量を計算 ---
     prev_len_str = str(row.get('prev_len', '')).strip()
-    change_chars = abs(len(current_text) - (int(prev_len_str) if prev_len_str.isdigit() else 0))
+    current_len = len(current_text)
+    change_chars = abs(current_len - (int(prev_len_str) if prev_len_str.isdigit() else 0))
 
+    # 大きいページのみ軽微変更フィルタを適用
+    # 小さいページ（ニュースサイトトップ等）はハッシュ変化で即通知
     if prev_len_str and prev_len_str.isdigit():
         prev_len = int(prev_len_str)
-        change_ratio = change_chars / max(prev_len, 1)
-
-        if change_chars < MIN_CHANGE_CHARS and change_ratio < MIN_CHANGE_RATIO:
-            print(f"  行{row_index}: 軽微変更（{change_chars}文字, {change_ratio:.1%}）スキップ")
-            if col_prev_hash:
-                sheet.update_cell(row_index, col_prev_hash, current_hash)
-            if col_prev_len:
-                sheet.update_cell(row_index, col_prev_len, str(len(current_text)))
-            return
+        if prev_len > SMALL_PAGE_THRESHOLD:
+            change_ratio = change_chars / max(prev_len, 1)
+            if change_chars < MIN_CHANGE_CHARS and change_ratio < MIN_CHANGE_RATIO:
+                print(f"  行{row_index}: 軽微変更（{change_chars}文字, {change_ratio:.1%}）スキップ")
+                if col_prev_hash:
+                    sheet.update_cell(row_index, col_prev_hash, current_hash)
+                if col_prev_len:
+                    sheet.update_cell(row_index, col_prev_len, str(current_len))
+                return
 
     # --- 通知 ---
     word = row.get('word', '')
@@ -157,7 +163,7 @@ def check_site_update(sheet, row_index, row, col_map):
     if col_prev_hash:
         sheet.update_cell(row_index, col_prev_hash, current_hash)
     if col_prev_len:
-        sheet.update_cell(row_index, col_prev_len, str(len(current_text)))
+        sheet.update_cell(row_index, col_prev_len, str(current_len))
 
 
 def generate_search_url(sheet, row_index, row, gemini_model, col_map):
@@ -261,7 +267,13 @@ def main():
             if memo == "HP更新":
                 check_site_update(sheet, i, row, col_map)
             else:
-                generate_search_url(sheet, i, row, gemini_model, col_map)
+                # まずURL未生成なら生成
+                url_cell = str(row.get('url', '')).strip()
+                if not url_cell.startswith('http'):
+                    generate_search_url(sheet, i, row, gemini_model, col_map)
+                else:
+                    # URL生成済みなら更新チェック
+                    check_site_update(sheet, i, row, col_map)
 
         print("--- 全処理完了 ---")
 
