@@ -57,24 +57,78 @@ def get_sheet():
 
 
 # --- 検索URLテンプレート（monitor.pyと共通） ---
+# キー: 日本語名・英語名・略称など複数登録して柔軟にマッチ
 SEARCH_TEMPLATES = {
-    "jalan":     "https://www.jalan.net/uw/uwp3200/uww3201init.do?keyword={word}",
-    "hotpepper": "https://www.hotpepper.jp/CSP/psh/rstLst/00/?keyword={word}",
-    "indeed":    "https://jp.indeed.com/jobs?q={word}",
-    "townwork":  "https://townwork.net/joSrchRsltList/?fw={word}",
-    "x":         "https://x.com/search?q={word}",
+    # グルメ
+    "食べログ":           "https://tabelog.com/rstLst/?vs=1&sa=&sk={word}",
+    "tabelog":            "https://tabelog.com/rstLst/?vs=1&sa=&sk={word}",
+    "ホットペッパーグルメ": "https://www.hotpepper.jp/CSP/psh/rstLst/00/?keyword={word}",
+    "ホットペッパー":      "https://www.hotpepper.jp/CSP/psh/rstLst/00/?keyword={word}",
+    "hotpepper":          "https://www.hotpepper.jp/CSP/psh/rstLst/00/?keyword={word}",
+    "ぐるなび":           "https://r.gnavi.co.jp/eki/result/?freeword={word}",
+    "gnavi":              "https://r.gnavi.co.jp/eki/result/?freeword={word}",
+    "retty":              "https://retty.me/search/?keyword={word}",
+    # 旅行・宿泊
+    "jalan":              "https://www.jalan.net/uw/uwp3200/uww3201init.do?keyword={word}",
+    "じゃらん":           "https://www.jalan.net/uw/uwp3200/uww3201init.do?keyword={word}",
+    "楽天トラベル":        "https://search.travel.rakuten.co.jp/ds/hotellist/search?f_free_word={word}",
+    "rakuten travel":     "https://search.travel.rakuten.co.jp/ds/hotellist/search?f_free_word={word}",
+    "booking.com":        "https://www.booking.com/searchresults.html?ss={word}",
+    "booking":            "https://www.booking.com/searchresults.html?ss={word}",
+    # 求人
+    "indeed":             "https://jp.indeed.com/jobs?q={word}",
+    "townwork":           "https://townwork.net/joSrchRsltList/?fw={word}",
+    "タウンワーク":        "https://townwork.net/joSrchRsltList/?fw={word}",
+    "リクナビnext":       "https://next.rikunabi.com/search/?freeWordKey={word}",
+    "マイナビ転職":        "https://tenshoku.mynavi.jp/list/kw{word}/",
+    "doda":               "https://doda.jp/keyword/{word}/",
+    # SNS・検索
+    "x":                  "https://x.com/search?q={word}",
+    "twitter":            "https://x.com/search?q={word}",
+    "youtube":            "https://www.youtube.com/results?search_query={word}",
+    "google":             "https://www.google.com/search?q={word}",
+    "bing":               "https://www.bing.com/search?q={word}",
+    # ショッピング
+    "amazon":             "https://www.amazon.co.jp/s?k={word}",
+    "アマゾン":           "https://www.amazon.co.jp/s?k={word}",
+    "楽天市場":           "https://search.rakuten.co.jp/search/mall/{word}/",
+    "rakuten":            "https://search.rakuten.co.jp/search/mall/{word}/",
+    "メルカリ":           "https://jp.mercari.com/search?keyword={word}",
+    "mercari":            "https://jp.mercari.com/search?keyword={word}",
+    "yahoo!ショッピング":  "https://shopping.yahoo.co.jp/search?p={word}",
+    "yahooショッピング":   "https://shopping.yahoo.co.jp/search?p={word}",
+    # 不動産
+    "suumo":              "https://suumo.jp/jj/common/ichiran/JJ010FJ001/?fw={word}",
+    "スーモ":             "https://suumo.jp/jj/common/ichiran/JJ010FJ001/?fw={word}",
+    "homes":              "https://www.homes.co.jp/chintai/theme/keyword={word}/",
+    # ニュース
+    "yahoo!ニュース":      "https://news.yahoo.co.jp/search?p={word}",
+    "yahooニュース":       "https://news.yahoo.co.jp/search?p={word}",
+    "nhk":                "https://www3.nhk.or.jp/news/json/search/2.0/search.json?q={word}",
 }
+
+
+def find_template(memo):
+    """メモからテンプレートを検索（完全一致→部分一致）"""
+    memo_clean = memo.strip().lower()
+    # 完全一致
+    if memo_clean in SEARCH_TEMPLATES:
+        return SEARCH_TEMPLATES[memo_clean]
+    # 部分一致（テンプレートキーがメモに含まれる or メモがキーに含まれる）
+    for key, tmpl in SEARCH_TEMPLATES.items():
+        if key in memo_clean or memo_clean in key:
+            return tmpl
+    return None
 
 
 def generate_url_now(word, memo):
     """検索URLを即時生成（テンプレート優先、未知サイトはGemini）"""
-    memo_lower = memo.strip().lower()
-
     # テンプレートにあるサイト
-    if memo_lower in SEARCH_TEMPLATES:
-        return SEARCH_TEMPLATES[memo_lower].format(word=quote(word))
+    tmpl = find_template(memo)
+    if tmpl:
+        return tmpl.format(word=quote(word))
 
-    # Geminiで生成
+    # Geminiで生成（PythonAnywhere無料プランでは外部API制限でエラーになる）
     gemini_key = os.environ.get("GEMINI_API_KEY")
     if not gemini_key:
         return ""
