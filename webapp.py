@@ -6,6 +6,7 @@ import re
 import gspread
 from google.oauth2.service_account import Credentials
 from flask import Flask, render_template, request, redirect, url_for, Response
+from urllib.parse import quote
 
 app = Flask(__name__)
 
@@ -53,6 +54,43 @@ def get_sheet():
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     client = gspread.authorize(creds)
     return client.open_by_key(SHEET_KEY).sheet1
+
+
+# --- 検索URLテンプレート（monitor.pyと共通） ---
+SEARCH_TEMPLATES = {
+    "jalan":     "https://www.jalan.net/uw/uwp3200/uww3201init.do?keyword={word}",
+    "hotpepper": "https://www.hotpepper.jp/CSP/psh/rstLst/00/?keyword={word}",
+    "indeed":    "https://jp.indeed.com/jobs?q={word}",
+    "townwork":  "https://townwork.net/joSrchRsltList/?fw={word}",
+    "x":         "https://x.com/search?q={word}",
+}
+
+
+def generate_url_now(word, memo):
+    """検索URLを即時生成（テンプレート優先、未知サイトはGemini）"""
+    memo_lower = memo.strip().lower()
+
+    # テンプレートにあるサイト
+    if memo_lower in SEARCH_TEMPLATES:
+        return SEARCH_TEMPLATES[memo_lower].format(word=quote(word))
+
+    # Geminiで生成
+    gemini_key = os.environ.get("GEMINI_API_KEY")
+    if not gemini_key:
+        return ""
+
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=gemini_key)
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        prompt = (
+            f"「{memo}」のサイト内検索で「{word}」を検索した結果ページのURLを"
+            f"1つだけ出力してください。URLのみを出力し、説明は不要です。"
+        )
+        res = model.generate_content(prompt)
+        return res.text.strip()
+    except Exception:
+        return ""
 
 
 # --- favicon / apple-touch-icon (空SVGで404を回避) ---
@@ -104,7 +142,9 @@ def add():
             source = request.form.get("preset_source", "x")
         freq = request.form.get("freq", "12")
         if keyword and source:
-            sheet.append_row([keyword, "", source, int(freq), "", ""])
+            # 即座にURL生成を試みる
+            generated_url = generate_url_now(keyword, source)
+            sheet.append_row([keyword, generated_url, source, int(freq), "", ""])
 
     return redirect(url_for("index"))
 
@@ -138,9 +178,15 @@ def edit():
                 sheet.update_cell(row_index, col['word'], new_word)
             if new_memo and 'memo' in col:
                 sheet.update_cell(row_index, col['memo'], new_memo)
-                # memoが変わったらURLをリセット（Geminiに再生成させる）
-                if 'url' in col:
-                    sheet.update_cell(row_index, col['url'], "")
+            # キーワードかメモが変わったらURLを即時再生成
+            if (new_word or new_memo) and 'url' in col:
+                # 現在の値を取得（変更されていない方）
+                current_row = sheet.row_values(row_index)
+                word_val = new_word or (current_row[col['word'] - 1] if len(current_row) >= col['word'] else "")
+                memo_val = new_memo or (current_row[col['memo'] - 1] if len(current_row) >= col['memo'] else "")
+                if word_val and memo_val and memo_val != "HP更新":
+                    generated_url = generate_url_now(word_val, memo_val)
+                    sheet.update_cell(row_index, col['url'], generated_url)
 
         # 頻度列（countまたはfreq）
         freq_col = col.get('count') or col.get('freq')

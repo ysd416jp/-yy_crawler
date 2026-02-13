@@ -2,6 +2,6 @@ flask
 gunicorn
 gspread
 google-auth
-google-genai
+google-generativeai
 requests
 beautifulsoup4

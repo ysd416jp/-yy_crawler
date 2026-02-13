@@ -254,7 +254,7 @@ def main():
         gemini_model = None
         if gemini_key:
             genai.configure(api_key=gemini_key)
-            gemini_model = genai.GenerativeModel('gemini-3-pro-preview')
+            gemini_model = genai.GenerativeModel('gemini-2.5-flash')
 
         # 現在の時刻（UTC）
         from datetime import datetime, timezone
@@ -264,7 +264,14 @@ def main():
         for i, row in enumerate(rows, start=2):
             memo = str(row.get('memo', '')).strip()
 
-            # 頻度チェック
+            # URL未生成の検索監視は頻度に関係なく常に生成を試みる
+            if memo != "HP更新":
+                url_cell = str(row.get('url', '')).strip()
+                if not url_cell.startswith('http'):
+                    generate_search_url(sheet, i, row, gemini_model, col_map)
+                    continue
+
+            # 頻度チェック（URL生成済みの監視・HP更新のみ）
             if not should_run_now(row, current_hour):
                 print(f"  行{i}: 頻度スキップ")
                 continue
@@ -272,13 +279,8 @@ def main():
             if memo == "HP更新":
                 check_site_update(sheet, i, row, col_map)
             else:
-                # まずURL未生成なら生成
-                url_cell = str(row.get('url', '')).strip()
-                if not url_cell.startswith('http'):
-                    generate_search_url(sheet, i, row, gemini_model, col_map)
-                else:
-                    # URL生成済みなら更新チェック
-                    check_site_update(sheet, i, row, col_map)
+                # URL生成済みなら更新チェック
+                check_site_update(sheet, i, row, col_map)
 
         print("--- 全処理完了 ---")
 
