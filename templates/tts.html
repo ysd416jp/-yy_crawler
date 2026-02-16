@@ -100,6 +100,24 @@
   }
   .dl-btn:hover { background: #1a2d4a; border-color: #4a90e2; }
 
+  /* --- Colab banner --- */
+  .colab-banner {
+    background: linear-gradient(135deg, #1a2d1a, #1a3d2a);
+    border: 1px solid #2a5a3a; border-radius: 12px;
+    padding: 16px 18px; margin-bottom: 16px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .colab-banner-icon { font-size: 1.6rem; flex-shrink: 0; }
+  .colab-banner-body { flex: 1; }
+  .colab-banner-title { font-size: 0.88rem; color: #7fcc7f; font-weight: 600; margin-bottom: 4px; }
+  .colab-banner-desc { font-size: 0.74rem; color: #888; line-height: 1.4; }
+  .colab-btn {
+    display: inline-block; padding: 8px 16px; border-radius: 8px;
+    background: #238b5e; color: #fff; font-size: 0.82rem; font-weight: 600;
+    text-decoration: none; transition: all 0.15s; flex-shrink: 0;
+  }
+  .colab-btn:hover { background: #2aa06e; transform: translateY(-1px); }
+
   /* --- Loading --- */
   .loading {
     display: none; text-align: center; padding: 20px; color: #888;
@@ -140,6 +158,17 @@
   <div class="header">
     <h1>TTS 読み上げ</h1>
     <a href="/" class="nav-btn">Web監視に戻る</a>
+  </div>
+
+  <!-- Colab banner -->
+  <div class="colab-banner">
+    <div class="colab-banner-icon">🧠</div>
+    <div class="colab-banner-body">
+      <div class="colab-banner-title">Qwen3-TTS ボイスクローン</div>
+      <div class="colab-banner-desc">AIボイスクローン (声コピー) を使うには<br>Google Colabで無料GPUを起動してください</div>
+    </div>
+    <a href="https://colab.research.google.com/github/ysd416jp/-yy_crawler/blob/main/Qwen3_TTS_Colab.ipynb"
+       class="colab-btn" target="_blank" rel="noopener">Colabで開く</a>
   </div>
 
   <!-- Text input -->
