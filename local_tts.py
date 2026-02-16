@@ -7,6 +7,7 @@ import argparse
 import gc
 import json
 import os
+import random
 import re
 import sys
 import tempfile
@@ -63,6 +64,28 @@ def _reset_model_state(model: Qwen3TTSModel):
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
     gc.collect()
+
+
+def _set_seed(seed: int):
+    """乱数シードを固定して再現性のある生成を行う。"""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+
+def _sampling_kwargs(temperature: float, top_p: float) -> dict:
+    """サンプリングパラメータの dict を返す。"""
+    return dict(
+        temperature=temperature,
+        top_p=top_p,
+        top_k=50,
+        repetition_penalty=1.0,
+        subtalker_temperature=temperature,
+        subtalker_top_p=top_p,
+        subtalker_top_k=50,
+    )
 
 
 # ==================================================
@@ -153,7 +176,10 @@ def main():
         "フランス語": "French",
     }
 
-    def voice_clone(text, language, ref_audio, ref_text):
+    # ボイスクローン用プロンプトキャッシュ
+    _clone_prompt_cache: dict = {"ref_audio": None, "ref_text": None, "prompt": None}
+
+    def voice_clone(text, language, ref_audio, ref_text, temperature, top_p, seed):
         if not text.strip():
             raise gr.Error("読み上げテキストを入力してください")
         if ref_audio is None:
@@ -161,30 +187,46 @@ def main():
         if not ref_text.strip():
             raise gr.Error("参照音声のテキストを入力してください")
         _reset_model_state(model_base)
+        if seed >= 0:
+            _set_seed(seed)
         text = _apply_dictionary(text)
         lang = LANGUAGES.get(language, "Japanese")
+        kwargs = _sampling_kwargs(temperature, top_p)
+        # 同じ参照音声ならプロンプトを再利用（声質の安定性向上）
+        if (_clone_prompt_cache["ref_audio"] != ref_audio
+                or _clone_prompt_cache["ref_text"] != ref_text):
+            _clone_prompt_cache["prompt"] = model_base.create_voice_clone_prompt(
+                ref_audio=ref_audio, ref_text=ref_text,
+            )
+            _clone_prompt_cache["ref_audio"] = ref_audio
+            _clone_prompt_cache["ref_text"] = ref_text
         wavs, sr = model_base.generate_voice_clone(
             text=text, language=lang,
-            ref_audio=ref_audio, ref_text=ref_text,
+            voice_clone_prompt=_clone_prompt_cache["prompt"],
+            **kwargs,
         )
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
         sf.write(tmp.name, wavs[0], sr)
         return tmp.name
 
-    def tts_generate(text, speaker, language):
+    def tts_generate(text, speaker, language, temperature, top_p, seed):
         if not text.strip():
             raise gr.Error("テキストを入力してください")
         _reset_model_state(model_custom)
+        if seed >= 0:
+            _set_seed(seed)
         text = _apply_dictionary(text)
         lang = LANGUAGES.get(language, "Japanese")
+        kwargs = _sampling_kwargs(temperature, top_p)
         wavs, sr = model_custom.generate_custom_voice(
             text=text, language=lang, speaker=speaker,
+            **kwargs,
         )
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
         sf.write(tmp.name, wavs[0], sr)
         return tmp.name
 
-    def voice_design_fn(text, language, instruct_text):
+    def voice_design_fn(text, language, instruct_text, temperature, top_p, seed):
         if model_design is None:
             raise gr.Error("VoiceDesign は 1.7B モデルのみ対応です")
         if not text.strip():
@@ -192,10 +234,14 @@ def main():
         if not instruct_text.strip():
             raise gr.Error("声質の説明を入力してください")
         _reset_model_state(model_design)
+        if seed >= 0:
+            _set_seed(seed)
         text = _apply_dictionary(text)
         lang = LANGUAGES.get(language, "Japanese")
+        kwargs = _sampling_kwargs(temperature, top_p)
         wavs, sr = model_design.generate_voice_design(
             text=text, language=lang, instruct=instruct_text,
+            **kwargs,
         )
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
         sf.write(tmp.name, wavs[0], sr)
@@ -231,11 +277,25 @@ def main():
             clone_lang = gr.Dropdown(
                 choices=list(LANGUAGES.keys()), value="日本語", label="言語",
             )
+            with gr.Accordion("生成設定", open=False):
+                clone_temp = gr.Slider(
+                    minimum=0.1, maximum=1.0, value=0.7, step=0.05,
+                    label="Temperature（低い=安定、高い=表現豊か）",
+                )
+                clone_top_p = gr.Slider(
+                    minimum=0.5, maximum=1.0, value=0.85, step=0.05,
+                    label="Top-P（低い=安定、1.0=制限なし）",
+                )
+                clone_seed = gr.Number(
+                    value=-1, precision=0,
+                    label="シード（-1=ランダム、0以上=固定で再現可能）",
+                )
             clone_btn = gr.Button("クローン音声を生成", variant="primary", size="lg")
             clone_output = gr.Audio(label="生成結果", type="filepath")
             clone_btn.click(
                 voice_clone,
-                [clone_text, clone_lang, clone_ref_audio, clone_ref_text],
+                [clone_text, clone_lang, clone_ref_audio, clone_ref_text,
+                 clone_temp, clone_top_p, clone_seed],
                 clone_output,
             )
 
@@ -253,9 +313,26 @@ def main():
                 tts_lang = gr.Dropdown(
                     choices=list(LANGUAGES.keys()), value="日本語", label="言語",
                 )
+            with gr.Accordion("生成設定", open=False):
+                tts_temp = gr.Slider(
+                    minimum=0.1, maximum=1.0, value=0.7, step=0.05,
+                    label="Temperature（低い=安定、高い=表現豊か）",
+                )
+                tts_top_p = gr.Slider(
+                    minimum=0.5, maximum=1.0, value=0.85, step=0.05,
+                    label="Top-P（低い=安定、1.0=制限なし）",
+                )
+                tts_seed = gr.Number(
+                    value=-1, precision=0,
+                    label="シード（-1=ランダム、0以上=固定で再現可能）",
+                )
             tts_btn = gr.Button("音声を生成", variant="primary", size="lg")
             tts_output = gr.Audio(label="生成結果", type="filepath")
-            tts_btn.click(tts_generate, [tts_text, tts_speaker, tts_lang], tts_output)
+            tts_btn.click(
+                tts_generate,
+                [tts_text, tts_speaker, tts_lang, tts_temp, tts_top_p, tts_seed],
+                tts_output,
+            )
 
         # === ボイスデザイン (1.7B のみ) ===
         if model_design is not None:
@@ -272,11 +349,25 @@ def main():
                     label="声質の説明 (英語推奨)", lines=3,
                     value="A young Japanese woman with a gentle and warm voice.",
                 )
+                with gr.Accordion("生成設定", open=False):
+                    design_temp = gr.Slider(
+                        minimum=0.1, maximum=1.0, value=0.7, step=0.05,
+                        label="Temperature（低い=安定、高い=表現豊か）",
+                    )
+                    design_top_p = gr.Slider(
+                        minimum=0.5, maximum=1.0, value=0.85, step=0.05,
+                        label="Top-P（低い=安定、1.0=制限なし）",
+                    )
+                    design_seed = gr.Number(
+                        value=-1, precision=0,
+                        label="シード（-1=ランダム、0以上=固定で再現可能）",
+                    )
                 design_btn = gr.Button("デザイン生成", variant="primary", size="lg")
                 design_output = gr.Audio(label="生成結果", type="filepath")
                 design_btn.click(
                     voice_design_fn,
-                    [design_text, design_lang, design_desc],
+                    [design_text, design_lang, design_desc,
+                     design_temp, design_top_p, design_seed],
                     design_output,
                 )
 
