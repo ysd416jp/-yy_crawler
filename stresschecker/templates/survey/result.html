@@ -32,6 +32,7 @@
     </div>
 
     <!-- ストレスの3要素 -->
+    <p class="text-center text-muted small mb-2">スコアが高いほどストレスが高い状態です。色が赤いほど注意が必要です。</p>
     <div class="row mb-4">
         <div class="col-md-4 mb-3">
             <div class="card h-100">
@@ -75,6 +76,8 @@
     <div class="card mb-4">
         <div class="card-body">
             <h5 class="card-title text-center">ストレス要因プロフィール</h5>
+            <p class="text-center text-muted small mb-1">外側ほどストレス要因が高い状態です</p>
+            <p class="text-center text-muted small mb-2" style="font-size: 0.75rem;">※コントロール度・適性度・働きがいは逆で、外側ほど良好</p>
             <div class="chart-container">
                 <canvas id="stressorChart"></canvas>
             </div>
@@ -88,6 +91,8 @@
     <div class="card mb-4">
         <div class="card-body">
             <h5 class="card-title text-center">心身のストレス反応</h5>
+            <p class="text-center text-muted small mb-1">外側ほどストレス反応が強い状態です</p>
+            <p class="text-center text-muted small mb-2" style="font-size: 0.75rem;">※活気は逆で、外側ほど良好</p>
             <div class="chart-container">
                 <canvas id="reactionChart"></canvas>
             </div>
@@ -101,22 +106,28 @@
     <div class="card mb-4">
         <div class="card-body">
             <h5 class="card-title text-center">周囲のサポート</h5>
-            <div class="row text-center">
-                {% for key in ['supervisor_support', 'coworker_support', 'family_support'] %}
-                <div class="col-4">
-                    <div class="support-bar">
-                        <div class="support-fill" style="height: {{ (5 - scores.subscale_scores[key] + 1) / 5 * 100 }}%"></div>
-                    </div>
-                    <small>{{ subscales[key].name|replace('からのサポート', '') }}</small>
-                    <br>
-                    <span class="badge
-                        {% if scores.subscale_scores[key] >= 4 %}bg-danger{% elif scores.subscale_scores[key] >= 3 %}bg-warning{% else %}bg-success{% endif %}">
-                        {{ scores.subscale_scores[key] }}/5
+            <p class="text-center text-muted small mb-3">スコアが高いほどサポートが不足している状態です</p>
+            {% for key in ['supervisor_support', 'coworker_support', 'family_support'] %}
+            {% set sc = scores.subscale_scores[key] %}
+            <div class="mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="small fw-bold">{{ subscales[key].name }}</span>
+                    <span class="badge {% if sc >= 4 %}bg-danger{% elif sc >= 3 %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                        {{ sc }} / 5
+                        {% if sc >= 4 %}注意{% elif sc >= 3 %}やや注意{% else %}良好{% endif %}
                     </span>
                 </div>
-                {% endfor %}
+                <div class="support-hbar-bg">
+                    <div class="support-hbar-fill {% if sc >= 4 %}hbar-danger{% elif sc >= 3 %}hbar-warning{% else %}hbar-success{% endif %}"
+                         style="width: {{ sc / 5 * 100 }}%"></div>
+                </div>
             </div>
-            <div class="mt-3 p-3 bg-light rounded">
+            {% endfor %}
+            <div class="d-flex justify-content-between text-muted small mt-1 mb-3">
+                <span>← 良好</span>
+                <span>注意が必要 →</span>
+            </div>
+            <div class="p-3 bg-light rounded">
                 <p class="mb-0 small">{{ comments.support }}</p>
             </div>
         </div>
@@ -126,6 +137,7 @@
     <div class="card mb-4">
         <div class="card-body">
             <h5 class="card-title">尺度別スコア一覧</h5>
+            <p class="text-muted small mb-2">1〜5の5段階評価。数値が高いほど注意が必要です。</p>
             <div class="table-responsive">
                 <table class="table table-sm">
                     <thead>
