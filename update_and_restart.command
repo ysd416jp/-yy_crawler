@@ -18,10 +18,13 @@ sleep 1
 # 最新コードを取得
 git pull origin claude/mobile-tts-system-JEkXZ
 
-# 必要なパッケージを自動インストール（未インストール時のみ）
+# 必要なパッケージを自動インストール
+# python3 -m pip を使い、python3 と同じ環境にインストールする
 echo ""
 echo "依存パッケージを確認中..."
-pip3 install -q qwen-tts gradio soundfile numpy torch 2>&1 | grep -v "already satisfied" | head -5
+python3 -m pip install -U qwen-tts gradio soundfile numpy torch
+echo ""
+echo "パッケージインストール完了"
 
 echo ""
 echo "========================================="
