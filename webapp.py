@@ -3,10 +3,13 @@ import os
 import json
 import base64
 import re
+import asyncio
+import tempfile
 import gspread
 from google.oauth2.service_account import Credentials
-from flask import Flask, render_template, request, redirect, url_for, Response
+from flask import Flask, render_template, request, redirect, url_for, Response, send_file
 from urllib.parse import quote
+import edge_tts
 
 app = Flask(__name__)
 
@@ -269,6 +272,77 @@ def delete(row_index):
         except Exception:
             pass
     return redirect(url_for("index"))
+
+
+# ============================================================
+# TTS (Text-to-Speech) 機能
+# ============================================================
+
+# 日本語音声の定義
+TTS_VOICES = [
+    {"id": "ja-JP-NanamiNeural",   "name": "Nanami (女性)", "gender": "Female"},
+    {"id": "ja-JP-KeitaNeural",    "name": "Keita (男性)",  "gender": "Male"},
+    {"id": "ja-JP-AoiNeural",      "name": "Aoi (女性)",    "gender": "Female"},
+    {"id": "ja-JP-DaichiNeural",   "name": "Daichi (男性)", "gender": "Male"},
+    {"id": "ja-JP-MayuNeural",     "name": "Mayu (女性)",   "gender": "Female"},
+    {"id": "ja-JP-NaokiNeural",    "name": "Naoki (男性)",  "gender": "Male"},
+    {"id": "ja-JP-ShioriNeural",   "name": "Shiori (女性)", "gender": "Female"},
+]
+
+
+@app.route("/tts")
+def tts_page():
+    return render_template("tts.html", voices=TTS_VOICES)
+
+
+@app.route("/tts/generate", methods=["POST"])
+def tts_generate():
+    text = request.form.get("text", "").strip()
+    voice = request.form.get("voice", "ja-JP-NanamiNeural")
+    rate = request.form.get("rate", "+0%")
+    pitch = request.form.get("pitch", "+0Hz")
+
+    if not text:
+        return Response("テキストが空です", status=400)
+
+    # 最大文字数制限（無料サービスなので）
+    if len(text) > 5000:
+        return Response("テキストは5000文字以内にしてください", status=400)
+
+    # voice IDのバリデーション
+    valid_ids = {v["id"] for v in TTS_VOICES}
+    if voice not in valid_ids:
+        voice = "ja-JP-NanamiNeural"
+
+    tmp_path = None
+    try:
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+        tmp_path = tmp.name
+        tmp.close()
+
+        async def _generate():
+            communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
+            await communicate.save(tmp_path)
+
+        asyncio.run(_generate())
+
+        # ファイルをメモリに読み込んでから返す
+        with open(tmp_path, "rb") as f:
+            audio_data = f.read()
+
+        return Response(
+            audio_data,
+            mimetype="audio/mpeg",
+            headers={"Content-Disposition": "inline; filename=tts_output.mp3"},
+        )
+    except Exception as e:
+        return Response(f"音声生成エラー: {e}", status=500)
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":

@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>TTS - テキスト読み上げ</title>
+<link rel="icon" href="/favicon.ico" type="image/svg+xml">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0e1117; color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', sans-serif;
+    min-height: 100vh; padding: 24px 16px;
+  }
+  .container { max-width: 640px; margin: 0 auto; }
+
+  /* --- Header --- */
+  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  .header h1 { font-size: 1.4rem; font-weight: 700; color: #fff; }
+  .nav-btn {
+    padding: 6px 14px; border-radius: 8px;
+    background: #1a1d24; border: 1px solid #2a2d35;
+    color: #aaa; font-size: 0.78rem; cursor: pointer;
+    text-decoration: none; transition: all 0.15s;
+  }
+  .nav-btn:hover { background: #24272e; color: #fff; }
+
+  /* --- Card --- */
+  .card {
+    background: #1a1d24; border-radius: 14px; padding: 20px;
+    border: 1px solid #2a2d35; margin-bottom: 16px;
+  }
+  .card-title {
+    font-size: 0.78rem; color: #666; font-weight: 600;
+    letter-spacing: 0.04em; margin-bottom: 12px;
+  }
+
+  /* --- Textarea --- */
+  textarea {
+    width: 100%; min-height: 150px; padding: 14px;
+    background: #0e1117; border: 1px solid #2a2d35; border-radius: 10px;
+    color: #e0e0e0; font-size: 1rem; font-family: inherit;
+    resize: vertical; outline: none; transition: border 0.15s;
+    line-height: 1.6;
+  }
+  textarea:focus { border-color: #4a90e2; }
+  textarea::placeholder { color: #444; }
+  .char-count { text-align: right; font-size: 0.72rem; color: #444; margin-top: 6px; }
+
+  /* --- Controls --- */
+  .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  label.ctrl-label { font-size: 0.78rem; color: #888; margin-bottom: 6px; display: block; }
+  select, input[type="range"] {
+    width: 100%; padding: 10px 12px; border-radius: 8px;
+    background: #0e1117; border: 1px solid #2a2d35; color: #e0e0e0;
+    font-size: 0.88rem; outline: none; transition: border 0.15s;
+  }
+  select:focus { border-color: #4a90e2; }
+  .range-wrap { display: flex; align-items: center; gap: 8px; }
+  .range-wrap input[type="range"] {
+    flex: 1; padding: 0; border: none; background: transparent;
+    -webkit-appearance: none; height: 6px;
+  }
+  input[type="range"]::-webkit-slider-runnable-track {
+    background: #2a2d35; height: 6px; border-radius: 3px;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 20px; height: 20px;
+    border-radius: 50%; background: #4a90e2; margin-top: -7px;
+  }
+  .range-val { font-size: 0.78rem; color: #888; min-width: 40px; text-align: center; }
+
+  /* --- Generate button --- */
+  .gen-btn {
+    width: 100%; padding: 16px; border: none; border-radius: 12px;
+    background: linear-gradient(135deg, #1a3d5c, #2370a0);
+    color: #fff; font-size: 1.05rem; font-weight: 700;
+    cursor: pointer; transition: all 0.2s; margin-top: 8px;
+    letter-spacing: 0.03em;
+  }
+  .gen-btn:hover { transform: translateY(-1px); filter: brightness(1.15); }
+  .gen-btn:active { transform: translateY(0); }
+  .gen-btn:disabled {
+    background: #1a1d24; color: #555; cursor: not-allowed;
+    transform: none; filter: none;
+  }
+
+  /* --- Player --- */
+  .player-card {
+    background: #1a1d24; border-radius: 14px; padding: 20px;
+    border: 1px solid #2a2d35; display: none;
+  }
+  .player-card.active { display: block; }
+  audio { width: 100%; margin-bottom: 12px; border-radius: 8px; }
+  .dl-btn {
+    display: block; width: 100%; padding: 12px; border: 1px solid #2a2d35;
+    border-radius: 10px; background: transparent; color: #4a90e2;
+    font-size: 0.9rem; font-weight: 600; cursor: pointer;
+    text-align: center; text-decoration: none; transition: all 0.15s;
+  }
+  .dl-btn:hover { background: #1a2d4a; border-color: #4a90e2; }
+
+  /* --- Loading --- */
+  .loading {
+    display: none; text-align: center; padding: 20px; color: #888;
+  }
+  .loading.active { display: block; }
+  .spinner {
+    width: 32px; height: 32px; border: 3px solid #2a2d35;
+    border-top-color: #4a90e2; border-radius: 50%;
+    animation: spin 0.8s linear infinite; margin: 0 auto 10px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* --- Error --- */
+  .error-msg {
+    display: none; background: #3a1a1a; border: 1px solid #6a3030;
+    border-radius: 8px; padding: 12px; color: #e05050;
+    font-size: 0.85rem; margin-top: 12px;
+  }
+  .error-msg.active { display: block; }
+
+  /* --- Footer --- */
+  .footer { text-align: right; color: #333; font-size: 0.68rem; margin-top: 40px; }
+
+  /* --- Preset buttons --- */
+  .presets { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .preset-btn {
+    padding: 6px 12px; border-radius: 20px;
+    background: #14161c; border: 1px solid #2a2d35;
+    color: #888; font-size: 0.75rem; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .preset-btn:hover { border-color: #4a90e2; color: #4a90e2; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>TTS 読み上げ</h1>
+    <a href="/" class="nav-btn">Web監視に戻る</a>
+  </div>
+
+  <!-- Text input -->
+  <div class="card">
+    <div class="card-title">読み上げテキスト</div>
+    <textarea id="tts-text" placeholder="ここにテキストを入力してください...&#10;&#10;日本語、英語、どちらも読み上げできます。" maxlength="5000"></textarea>
+    <div class="char-count"><span id="char-num">0</span> / 5,000</div>
+    <div class="presets">
+      <button class="preset-btn" onclick="setPreset('こんにちは。テキスト読み上げのテストです。')">挨拶テスト</button>
+      <button class="preset-btn" onclick="setPreset('本日は晴天なり。明日の天気は曇りのち雨でしょう。')">天気テスト</button>
+      <button class="preset-btn" onclick="setPreset('The quick brown fox jumps over the lazy dog.')">英語テスト</button>
+    </div>
+  </div>
+
+  <!-- Voice & Settings -->
+  <div class="card">
+    <div class="card-title">音声設定</div>
+    <div class="controls">
+      <div>
+        <label class="ctrl-label">音声</label>
+        <select id="tts-voice">
+          {% for v in voices %}
+          <option value="{{ v.id }}">{{ v.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="ctrl-label">速度</label>
+        <div class="range-wrap">
+          <input type="range" id="tts-rate" min="-50" max="100" value="0" step="10">
+          <span class="range-val" id="rate-val">+0%</span>
+        </div>
+      </div>
+      <div>
+        <label class="ctrl-label">ピッチ</label>
+        <div class="range-wrap">
+          <input type="range" id="tts-pitch" min="-50" max="50" value="0" step="5">
+          <span class="range-val" id="pitch-val">+0Hz</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Generate button -->
+  <button class="gen-btn" id="gen-btn" onclick="generateTTS()">
+    音声を生成する
+  </button>
+
+  <!-- Loading -->
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <div>音声を生成中...</div>
+  </div>
+
+  <!-- Error -->
+  <div class="error-msg" id="error-msg"></div>
+
+  <!-- Player -->
+  <div class="player-card" id="player-card">
+    <div class="card-title">生成結果</div>
+    <audio id="audio-player" controls></audio>
+    <a id="dl-btn" class="dl-btn" download="tts_output.mp3">ダウンロード</a>
+  </div>
+
+  <div class="footer">TTS powered by Edge-TTS (Free)</div>
+</div>
+
+<script>
+var textEl = document.getElementById('tts-text');
+var charNum = document.getElementById('char-num');
+var rateSlider = document.getElementById('tts-rate');
+var rateVal = document.getElementById('rate-val');
+var pitchSlider = document.getElementById('tts-pitch');
+var pitchVal = document.getElementById('pitch-val');
+
+textEl.addEventListener('input', function() {
+  charNum.textContent = this.value.length;
+});
+
+rateSlider.addEventListener('input', function() {
+  var v = parseInt(this.value);
+  rateVal.textContent = (v >= 0 ? '+' : '') + v + '%';
+});
+
+pitchSlider.addEventListener('input', function() {
+  var v = parseInt(this.value);
+  pitchVal.textContent = (v >= 0 ? '+' : '') + v + 'Hz';
+});
+
+function setPreset(text) {
+  textEl.value = text;
+  charNum.textContent = text.length;
+}
+
+function generateTTS() {
+  var text = textEl.value.trim();
+  if (!text) { textEl.focus(); return; }
+
+  var voice = document.getElementById('tts-voice').value;
+  var rate = rateVal.textContent;
+  var pitch = pitchVal.textContent;
+
+  var btn = document.getElementById('gen-btn');
+  var loading = document.getElementById('loading');
+  var errorMsg = document.getElementById('error-msg');
+  var playerCard = document.getElementById('player-card');
+
+  btn.disabled = true;
+  btn.textContent = '生成中...';
+  loading.classList.add('active');
+  errorMsg.classList.remove('active');
+  playerCard.classList.remove('active');
+
+  var formData = new FormData();
+  formData.append('text', text);
+  formData.append('voice', voice);
+  formData.append('rate', rate);
+  formData.append('pitch', pitch);
+
+  fetch('/tts/generate', { method: 'POST', body: formData })
+    .then(function(res) {
+      if (!res.ok) {
+        return res.text().then(function(t) { throw new Error(t); });
+      }
+      return res.blob();
+    })
+    .then(function(blob) {
+      var url = URL.createObjectURL(blob);
+      var audio = document.getElementById('audio-player');
+      audio.src = url;
+      document.getElementById('dl-btn').href = url;
+      playerCard.classList.add('active');
+      audio.play();
+    })
+    .catch(function(err) {
+      errorMsg.textContent = err.message || '音声生成に失敗しました';
+      errorMsg.classList.add('active');
+    })
+    .finally(function() {
+      btn.disabled = false;
+      btn.textContent = '音声を生成する';
+      loading.classList.remove('active');
+    });
+}
+</script>
+</body>
+</html>
