@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}ストレスチェック - 実施期間外{% endblock %}
+{% block body_class %}survey-page{% endblock %}
+
+{% block content %}
+<div class="survey-container text-center py-5">
+    <h2 class="mb-3">実施期間外です</h2>
+    <p class="text-muted">
+        このストレスチェックの実施期間は<br>
+        <strong>{{ period.start_date.strftime('%Y年%m月%d日') }}</strong> 〜
+        <strong>{{ period.end_date.strftime('%Y年%m月%d日') }}</strong><br>
+        です。
+    </p>
+    <p class="text-muted">期間内に再度アクセスしてください。</p>
+</div>
+{% endblock %}

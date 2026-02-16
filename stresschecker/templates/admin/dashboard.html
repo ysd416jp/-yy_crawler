@@ -1,0 +1,143 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}管理ダッシュボード{% endblock %}
+
+{% block content %}
+<div class="py-4">
+    <h3 class="mb-4">ダッシュボード</h3>
+
+    {% if active_period %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white">
+                    実施中: {{ active_period.name }}
+                    <span class="badge bg-light text-primary ms-2">
+                        {{ active_period.start_date.strftime('%m/%d') }} 〜 {{ active_period.end_date.strftime('%m/%d') }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3 mb-3">
+                            <div class="stat-card">
+                                <div class="stat-number">{{ stats.total }}</div>
+                                <div class="stat-label">対象者数</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="stat-card">
+                                <div class="stat-number text-success">{{ stats.completed }}</div>
+                                <div class="stat-label">受検済み</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="stat-card">
+                                <div class="stat-number text-primary">{{ stats.rate }}%</div>
+                                <div class="stat-label">受検率</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="stat-card">
+                                <div class="stat-number text-danger">{{ stats.high_stress }}</div>
+                                <div class="stat-label">高ストレス者</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 進捗バー -->
+                    <div class="progress mt-2" style="height: 24px;">
+                        <div class="progress-bar bg-success" style="width: {{ stats.rate }}%">
+                            {{ stats.rate }}%
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">クイックアクション</h5>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('admin_tokens', period_id=active_period.id) }}" class="btn btn-outline-primary">
+                            トークン管理・QR印刷
+                        </a>
+                        <a href="{{ url_for('admin_analysis', period_id=active_period.id) }}" class="btn btn-outline-primary">
+                            集団分析を見る
+                        </a>
+                        <a href="{{ url_for('admin_results', period_id=active_period.id) }}" class="btn btn-outline-primary">
+                            個人結果一覧
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">運用手順</h5>
+                    <ol class="small">
+                        <li class="mb-1"><a href="{{ url_for('admin_departments') }}">部署を登録</a>する</li>
+                        <li class="mb-1"><a href="{{ url_for('admin_employees') }}">従業員を登録</a>する（CSV一括可）</li>
+                        <li class="mb-1"><a href="{{ url_for('admin_periods') }}">実施期間を作成</a>する</li>
+                        <li class="mb-1"><a href="{{ url_for('admin_tokens') }}">トークンを発行</a>する</li>
+                        <li class="mb-1">トークン一覧をPDF/CSVでダウンロードし、QRコードを印刷して配布</li>
+                        <li class="mb-1">実施期間中に受検状況を確認</li>
+                        <li class="mb-1">実施後、<a href="{{ url_for('admin_analysis') }}">集団分析</a>を確認</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    <div class="alert alert-info">
+        <h5>はじめに</h5>
+        <p>ストレスチェックを開始するには、以下の手順で準備してください。</p>
+        <ol>
+            <li><a href="{{ url_for('admin_departments') }}">部署を登録</a></li>
+            <li><a href="{{ url_for('admin_employees') }}">従業員を登録</a>（CSV一括登録可能）</li>
+            <li><a href="{{ url_for('admin_periods') }}">実施期間を作成</a></li>
+            <li><a href="{{ url_for('admin_tokens') }}">トークンを発行</a>して配布</li>
+        </ol>
+    </div>
+    {% endif %}
+
+    {% if periods %}
+    <div class="card mt-4">
+        <div class="card-body">
+            <h5 class="card-title">過去の実施一覧</h5>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>実施名</th>
+                            <th>期間</th>
+                            <th>状態</th>
+                            <th>受検率</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in periods %}
+                        <tr>
+                            <td>{{ p.name }}</td>
+                            <td>{{ p.start_date.strftime('%Y/%m/%d') }} 〜 {{ p.end_date.strftime('%Y/%m/%d') }}</td>
+                            <td>
+                                {% if p.is_active %}
+                                <span class="badge bg-success">実施中</span>
+                                {% else %}
+                                <span class="badge bg-secondary">終了</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ p.completion_rate }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

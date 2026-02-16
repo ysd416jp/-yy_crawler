@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}ストレスチェック{% endblock %}
+{% block body_class %}survey-page{% endblock %}
+
+{% block content %}
+<div class="survey-container text-center py-5">
+    <div class="mb-4">
+        <div class="survey-icon mx-auto">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#4a9d8f" stroke-width="1.5">
+                <path d="M9 12l2 2 4-4"/>
+                <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9-4.03-9-9-9z"/>
+            </svg>
+        </div>
+    </div>
+    <h1 class="mb-3">ストレスチェック</h1>
+    <p class="text-muted mb-4">
+        配布された用紙に記載のURL、またはQRコードから<br>
+        アンケートにアクセスしてください。
+    </p>
+    <div class="card mx-auto" style="max-width: 400px;">
+        <div class="card-body">
+            <p class="text-muted small mb-0">
+                このシステムは厚生労働省「職業性ストレス簡易調査票（57項目）」に<br>準拠しています。
+            </p>
+        </div>
+    </div>
+    <div class="mt-4">
+        <a href="{{ url_for('admin_login') }}" class="text-muted small">管理者ログイン</a>
+    </div>
+</div>
+{% endblock %}

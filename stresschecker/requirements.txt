@@ -1,0 +1,6 @@
+flask
+flask-sqlalchemy
+gunicorn
+werkzeug
+qrcode[pil]
+fpdf2

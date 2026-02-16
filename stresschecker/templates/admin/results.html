@@ -1,0 +1,77 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}個人結果一覧{% endblock %}
+
+{% block content %}
+<div class="py-4">
+    <h3 class="mb-4">個人結果一覧（実施事務従事者用）</h3>
+
+    <div class="alert alert-warning small">
+        <strong>注意:</strong> この画面は実施事務従事者および産業医のみが閲覧できます。
+        個人結果は本人の同意なく事業者に提供することはできません。
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row align-items-end">
+                <div class="col-md-4 mb-2">
+                    <label class="form-label">実施期間</label>
+                    <select name="period_id" class="form-select" onchange="this.form.submit()">
+                        {% for p in periods %}
+                        <option value="{{ p.id }}" {% if p.id == selected_period_id %}selected{% endif %}>
+                            {{ p.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if results %}
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead>
+                        <tr>
+                            <th>名前</th>
+                            <th>部署</th>
+                            <th class="text-center">ストレスレベル</th>
+                            <th class="text-center">高ストレス</th>
+                            <th>受検日</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in results %}
+                        <tr>
+                            <td>{{ r.employee.name }}</td>
+                            <td>{{ r.employee.department.name if r.employee.department else '-' }}</td>
+                            <td class="text-center">
+                                {% if r.stress_level == 'high' %}
+                                <span class="badge bg-danger">高</span>
+                                {% elif r.stress_level == 'moderate' %}
+                                <span class="badge bg-warning text-dark">中</span>
+                                {% else %}
+                                <span class="badge bg-success">低</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if r.is_high_stress %}
+                                <span class="text-danger fw-bold">該当</span>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td>{{ r.created_at.strftime('%Y/%m/%d %H:%M') }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info">受検データがありません。</div>
+    {% endif %}
+</div>
+{% endblock %}

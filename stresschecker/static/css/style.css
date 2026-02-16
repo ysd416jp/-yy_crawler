@@ -1,0 +1,276 @@
+/* ====================================
+   ストレスチェック システム CSS
+   ==================================== */
+
+/* --- 基本設定 --- */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+                 "Noto Sans JP", sans-serif;
+    background-color: #f8f9fa;
+    color: #333;
+}
+
+/* --- 受検画面 --- */
+.survey-page {
+    background-color: #f0f4f3;
+}
+
+.survey-container {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 0 16px;
+}
+
+.survey-icon {
+    width: 80px;
+    height: 80px;
+    background: #e8f5f0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* --- 質問カード --- */
+.group-header {
+    background: linear-gradient(135deg, #2c7a5e 0%, #3a9d7c 100%);
+    color: #fff;
+    padding: 16px 20px;
+    border-radius: 10px;
+    margin-top: 24px;
+}
+
+.group-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.subtext-header p {
+    font-size: 0.9rem;
+    padding: 8px 12px;
+    background: #e8f0ed;
+    border-radius: 6px;
+    border-left: 3px solid #3a9d7c;
+}
+
+.question-card {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 12px 16px;
+    transition: all 0.2s;
+}
+
+.question-card.answered {
+    border-color: #4a9d8f;
+    background: #fafffe;
+}
+
+.question-card.unanswered-highlight {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.25);
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.25); }
+    50% { box-shadow: 0 0 0 4px rgba(220, 53, 69, 0.15); }
+}
+
+.question-number {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #6c757d;
+    margin-bottom: 4px;
+}
+
+.question-text {
+    font-size: 0.95rem;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.choices-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.choice-label {
+    flex: 1;
+    min-width: 0;
+    cursor: pointer;
+}
+
+.choice-label input[type="radio"] {
+    display: none;
+}
+
+.choice-btn {
+    display: block;
+    text-align: center;
+    padding: 8px 4px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    color: #495057;
+    background: #fff;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.choice-label input:checked + .choice-btn {
+    background: #2c7a5e;
+    color: #fff;
+    border-color: #2c7a5e;
+    font-weight: 600;
+}
+
+.choice-btn:hover {
+    border-color: #2c7a5e;
+    background: #f0f9f6;
+}
+
+/* --- プログレスバー（スティッキー） --- */
+.sticky-top {
+    z-index: 100;
+}
+
+/* --- 結果画面 --- */
+.result-summary {
+    border-width: 2px;
+}
+
+.stress-badge {
+    display: inline-block;
+    font-size: 1.3rem;
+    font-weight: 700;
+    padding: 10px 32px;
+    border-radius: 50px;
+}
+
+.stress-high {
+    background: #f8d7da;
+    color: #842029;
+}
+
+.stress-moderate {
+    background: #fff3cd;
+    color: #664d03;
+}
+
+.stress-low {
+    background: #d1e7dd;
+    color: #0f5132;
+}
+
+.score-circle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 8px 0;
+}
+
+.score-high {
+    background: #f8d7da;
+    color: #842029;
+}
+
+.score-moderate {
+    background: #fff3cd;
+    color: #664d03;
+}
+
+.score-low {
+    background: #d1e7dd;
+    color: #0f5132;
+}
+
+.chart-container {
+    position: relative;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+/* サポートバー */
+.support-bar {
+    width: 40px;
+    height: 100px;
+    background: #e9ecef;
+    border-radius: 4px;
+    margin: 0 auto 8px;
+    position: relative;
+    overflow: hidden;
+}
+
+.support-fill {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(to top, #dc3545, #ffc107, #198754);
+    border-radius: 0 0 4px 4px;
+    transition: height 0.5s;
+}
+
+/* --- 管理画面 --- */
+.stat-card {
+    padding: 16px;
+}
+
+.stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.stat-label {
+    font-size: 0.85rem;
+    color: #6c757d;
+    margin-top: 4px;
+}
+
+/* --- レスポンシブ --- */
+@media (max-width: 576px) {
+    .choices-row {
+        flex-direction: column;
+    }
+
+    .choice-btn {
+        padding: 10px;
+        font-size: 0.85rem;
+    }
+
+    .question-card {
+        padding: 10px 12px;
+    }
+
+    .chart-container {
+        max-width: 300px;
+    }
+
+    .stat-number {
+        font-size: 1.5rem;
+    }
+}
+
+/* --- 印刷用 --- */
+@media print {
+    .navbar, .btn, .sticky-top {
+        display: none !important;
+    }
+    body {
+        background: #fff;
+    }
+    .card {
+        border: 1px solid #ddd !important;
+        break-inside: avoid;
+    }
+}

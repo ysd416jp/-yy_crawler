@@ -1,0 +1,96 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}トークン管理{% endblock %}
+
+{% block content %}
+<div class="py-4">
+    <h3 class="mb-4">トークン発行・QRコード</h3>
+
+    <!-- 実施期間選択 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label">実施期間</label>
+                    <select id="periodSelect" class="form-select"
+                            onchange="location.href='{{ url_for('admin_tokens') }}?period_id='+this.value">
+                        {% for p in periods %}
+                        <option value="{{ p.id }}" {% if p.id == selected_period_id %}selected{% endif %}>
+                            {{ p.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-8">
+                    <div class="d-flex gap-2">
+                        <form method="POST" action="{{ url_for('generate_tokens') }}">
+                            <input type="hidden" name="period_id" value="{{ selected_period_id }}">
+                            <button type="submit" class="btn btn-primary"
+                                    onclick="return confirm('全従業員にトークンを発行しますか？')">
+                                一括トークン発行
+                            </button>
+                        </form>
+                        {% if tokens %}
+                        <a href="{{ url_for('tokens_pdf', period_id=selected_period_id) }}"
+                           class="btn btn-outline-success">
+                            PDF/CSVダウンロード
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if tokens %}
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">
+                    トークン一覧
+                    <span class="badge bg-secondary">{{ tokens|length }}名</span>
+                </h5>
+                <div>
+                    <span class="badge bg-success">受検済: {{ tokens|selectattr('is_completed')|list|length }}</span>
+                    <span class="badge bg-warning text-dark">未受検: {{ tokens|rejectattr('is_completed')|list|length }}</span>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead>
+                        <tr>
+                            <th>名前</th>
+                            <th>部署</th>
+                            <th>状態</th>
+                            <th>受検URL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tk in tokens %}
+                        <tr>
+                            <td>{{ tk.employee.name }}</td>
+                            <td>{{ tk.employee.department.name if tk.employee.department else '-' }}</td>
+                            <td>
+                                {% if tk.is_completed %}
+                                <span class="badge bg-success">受検済</span>
+                                <small class="text-muted">{{ tk.completed_at.strftime('%m/%d %H:%M') if tk.completed_at }}</small>
+                                {% else %}
+                                <span class="badge bg-warning text-dark">未受検</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <code class="small user-select-all">{{ request.host_url }}survey/{{ tk.token }}</code>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        まだトークンが発行されていません。「一括トークン発行」ボタンで全従業員にトークンを発行してください。
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

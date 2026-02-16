@@ -1,0 +1,88 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}実施期間管理{% endblock %}
+
+{% block content %}
+<div class="py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3>実施期間管理</h3>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addPeriodModal">
+            + 新規作成
+        </button>
+    </div>
+
+    {% if periods %}
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>実施名</th>
+                    <th>開始日</th>
+                    <th>終了日</th>
+                    <th>状態</th>
+                    <th>受検率</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in periods %}
+                <tr>
+                    <td>{{ p.name }}</td>
+                    <td>{{ p.start_date.strftime('%Y/%m/%d') }}</td>
+                    <td>{{ p.end_date.strftime('%Y/%m/%d') }}</td>
+                    <td>
+                        {% if p.is_active %}
+                        <span class="badge bg-success">有効</span>
+                        {% else %}
+                        <span class="badge bg-secondary">無効</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ p.completion_rate }}%</td>
+                    <td>
+                        <a href="{{ url_for('toggle_period', period_id=p.id) }}"
+                           class="btn btn-sm btn-outline-secondary">
+                            {% if p.is_active %}無効化{% else %}有効化{% endif %}
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="alert alert-info">まだ実施期間がありません。</div>
+    {% endif %}
+</div>
+
+<!-- 新規作成モーダル -->
+<div class="modal fade" id="addPeriodModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST">
+                <div class="modal-header">
+                    <h5 class="modal-title">実施期間を作成</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">実施名</label>
+                        <input type="text" name="name" class="form-control"
+                               placeholder="例: 2026年度 第1回" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">開始日</label>
+                        <input type="date" name="start_date" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">終了日</label>
+                        <input type="date" name="end_date" class="form-control" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                    <button type="submit" class="btn btn-primary">作成</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

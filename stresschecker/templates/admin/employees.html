@@ -1,0 +1,116 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}従業員管理{% endblock %}
+
+{% block content %}
+<div class="py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3>従業員管理 <small class="text-muted">({{ employees|length }}名)</small></h3>
+        <div>
+            <button class="btn btn-outline-primary me-2" data-bs-toggle="modal" data-bs-target="#csvModal">
+                CSV一括登録
+            </button>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addEmpModal">
+                + 個別追加
+            </button>
+        </div>
+    </div>
+
+    {% if employees %}
+    <div class="table-responsive">
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>名前</th>
+                    <th>社員番号</th>
+                    <th>部署</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in employees %}
+                <tr>
+                    <td>{{ e.name }}</td>
+                    <td>{{ e.employee_code or '-' }}</td>
+                    <td>{{ e.department.name if e.department else '-' }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('delete_employee', emp_id=e.id) }}"
+                              onsubmit="return confirm('削除しますか？');" style="display:inline">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">削除</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="alert alert-info">従業員が登録されていません。</div>
+    {% endif %}
+</div>
+
+<!-- 個別追加モーダル -->
+<div class="modal fade" id="addEmpModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST">
+                <input type="hidden" name="action" value="add">
+                <div class="modal-header">
+                    <h5 class="modal-title">従業員を追加</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">名前</label>
+                        <input type="text" name="name" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">社員番号（任意）</label>
+                        <input type="text" name="employee_code" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">部署</label>
+                        <select name="department_id" class="form-select">
+                            <option value="">未所属</option>
+                            {% for d in departments %}
+                            <option value="{{ d.id }}">{{ d.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                    <button type="submit" class="btn btn-primary">追加</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- CSV一括登録モーダル -->
+<div class="modal fade" id="csvModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="csv_upload">
+                <div class="modal-header">
+                    <h5 class="modal-title">CSV一括登録</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small">CSVファイルの形式:</p>
+                    <pre class="bg-light p-2 small">名前,部署,社員番号
+山田太郎,営業部,E001
+佐藤花子,総務部,E002</pre>
+                    <div class="mb-3">
+                        <input type="file" name="csv_file" class="form-control" accept=".csv" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                    <button type="submit" class="btn btn-primary">登録</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}ストレスチェック - 受検開始{% endblock %}
+{% block body_class %}survey-page{% endblock %}
+
+{% block content %}
+<div class="survey-container py-4">
+    <h2 class="text-center mb-4">ストレスチェック</h2>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">受検にあたっての注意事項</h5>
+            <ul class="mb-0">
+                <li>このチェックは、あなたのストレスの状態を知るためのものです。</li>
+                <li>回答内容が上司や人事に知られることはありません。</li>
+                <li>高ストレスと判定された方には、医師による面接指導を受ける機会が提供されます。</li>
+                <li>最近1か月間のあなたの状態について、最もあてはまるものを選んでください。</li>
+                <li>全57問、所要時間は約5〜10分です。</li>
+                <li>途中で中断した場合、最初からやり直しとなります。</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="card mb-4 bg-light">
+        <div class="card-body text-center">
+            <p class="mb-1 text-muted small">実施期間</p>
+            <p class="mb-0 fw-bold">
+                {{ period.start_date.strftime('%Y年%m月%d日') }} 〜
+                {{ period.end_date.strftime('%Y年%m月%d日') }}
+            </p>
+        </div>
+    </div>
+
+    <div class="text-center">
+        <a href="{{ url_for('survey_questions', token=token.token) }}"
+           class="btn btn-primary btn-lg px-5">
+            回答をはじめる
+        </a>
+    </div>
+</div>
+{% endblock %}

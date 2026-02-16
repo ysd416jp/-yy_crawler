@@ -1,0 +1,285 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}集団分析{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="py-4">
+    <h3 class="mb-4">集団分析</h3>
+
+    <!-- フィルター -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row align-items-end">
+                <div class="col-md-4 mb-2">
+                    <label class="form-label">実施期間</label>
+                    <select name="period_id" class="form-select">
+                        {% for p in periods %}
+                        <option value="{{ p.id }}" {% if p.id == selected_period_id %}selected{% endif %}>
+                            {{ p.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4 mb-2">
+                    <label class="form-label">部署（任意）</label>
+                    <select name="department_id" class="form-select">
+                        <option value="">全体</option>
+                        {% for d in departments %}
+                        <option value="{{ d.id }}" {% if d.id == selected_dept_id %}selected{% endif %}>
+                            {{ d.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 mb-2">
+                    <button type="submit" class="btn btn-primary w-100">表示</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if analysis %}
+    <!-- サマリー -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <div class="stat-number">{{ analysis.summary.total_count }}</div>
+                    <div class="stat-label">受検者数</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <div class="stat-number text-danger">{{ analysis.summary.high_stress_rate }}%</div>
+                    <div class="stat-label">高ストレス者率</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <div class="stat-number
+                        {% if analysis.total_risk >= 120 %}text-danger
+                        {% elif analysis.total_risk >= 100 %}text-warning
+                        {% else %}text-success{% endif %}">
+                        {{ analysis.total_risk }}
+                    </div>
+                    <div class="stat-label">総合健康リスク</div>
+                    <small class="text-muted">（全国平均=100）</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <div class="stat-number">{{ analysis.summary.high_stress_count }}</div>
+                    <div class="stat-label">高ストレス者数</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 仕事のストレス判定図 -->
+    <div class="row mb-4">
+        <div class="col-md-6 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title text-center">量-コントロール判定図</h5>
+                    <canvas id="demandControlChart"></canvas>
+                    <div class="text-center mt-2">
+                        <span class="badge
+                            {% if analysis.demand_control.risk >= 120 %}bg-danger
+                            {% elif analysis.demand_control.risk >= 100 %}bg-warning text-dark
+                            {% else %}bg-success{% endif %}">
+                            健康リスク: {{ analysis.demand_control.risk }}
+                        </span>
+                    </div>
+                    <div class="small text-muted mt-2">
+                        <div>仕事の量的負担: {{ analysis.demand_control.workload }}（全国平均 7.6）</div>
+                        <div>仕事のコントロール: {{ analysis.demand_control.control }}（全国平均 7.4）</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title text-center">職場の支援判定図</h5>
+                    <canvas id="supportChart"></canvas>
+                    <div class="text-center mt-2">
+                        <span class="badge
+                            {% if analysis.support.risk >= 120 %}bg-danger
+                            {% elif analysis.support.risk >= 100 %}bg-warning text-dark
+                            {% else %}bg-success{% endif %}">
+                            健康リスク: {{ analysis.support.risk }}
+                        </span>
+                    </div>
+                    <div class="small text-muted mt-2">
+                        <div>上司の支援: {{ analysis.support.supervisor }}（全国平均 7.5）</div>
+                        <div>同僚の支援: {{ analysis.support.coworker }}（全国平均 7.9）</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 尺度別平均スコア -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">尺度別平均スコア</h5>
+            <canvas id="subscaleChart" height="300"></canvas>
+        </div>
+    </div>
+
+    {% if dept_analyses %}
+    <!-- 部署別比較 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">部署別 健康リスク比較</h5>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>部署</th>
+                            <th class="text-center">人数</th>
+                            <th class="text-center">高ストレス率</th>
+                            <th class="text-center">量-コントロール</th>
+                            <th class="text-center">職場支援</th>
+                            <th class="text-center">総合リスク</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for da in dept_analyses %}
+                        <tr>
+                            <td>{{ da.department.name }}</td>
+                            <td class="text-center">{{ da.analysis.summary.total_count }}</td>
+                            <td class="text-center">
+                                <span class="{% if da.analysis.summary.high_stress_rate >= 15 %}text-danger fw-bold{% endif %}">
+                                    {{ da.analysis.summary.high_stress_rate }}%
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge {% if da.analysis.demand_control.risk >= 120 %}bg-danger{% elif da.analysis.demand_control.risk >= 100 %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                                    {{ da.analysis.demand_control.risk }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge {% if da.analysis.support.risk >= 120 %}bg-danger{% elif da.analysis.support.risk >= 100 %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                                    {{ da.analysis.support.risk }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge {% if da.analysis.total_risk >= 120 %}bg-danger{% elif da.analysis.total_risk >= 100 %}bg-warning text-dark{% else %}bg-success{% endif %} fs-6">
+                                    {{ da.analysis.total_risk }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="alert alert-info">
+        受検データがまだありません。受検が完了すると集団分析結果が表示されます。
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if analysis %}
+<script>
+// 量-コントロール判定図（散布図）
+new Chart(document.getElementById('demandControlChart'), {
+    type: 'scatter',
+    data: {
+        datasets: [
+            {
+                label: 'あなたの組織',
+                data: [{x: {{ analysis.demand_control.workload }}, y: {{ analysis.demand_control.control }}}],
+                backgroundColor: 'rgba(220, 53, 69, 1)',
+                pointRadius: 10,
+                pointStyle: 'triangle',
+            },
+            {
+                label: '全国平均',
+                data: [{x: 7.6, y: 7.4}],
+                backgroundColor: 'rgba(108, 117, 125, 0.8)',
+                pointRadius: 8,
+            },
+        ]
+    },
+    options: {
+        scales: {
+            x: { title: { display: true, text: '仕事の量的負担 →' }, min: 3, max: 12 },
+            y: { title: { display: true, text: '← 仕事のコントロール' }, min: 3, max: 12, reverse: true },
+        },
+        plugins: { legend: { position: 'bottom' } },
+    }
+});
+
+// 職場の支援判定図
+new Chart(document.getElementById('supportChart'), {
+    type: 'scatter',
+    data: {
+        datasets: [
+            {
+                label: 'あなたの組織',
+                data: [{x: {{ analysis.support.supervisor }}, y: {{ analysis.support.coworker }}}],
+                backgroundColor: 'rgba(220, 53, 69, 1)',
+                pointRadius: 10,
+                pointStyle: 'triangle',
+            },
+            {
+                label: '全国平均',
+                data: [{x: 7.5, y: 7.9}],
+                backgroundColor: 'rgba(108, 117, 125, 0.8)',
+                pointRadius: 8,
+            },
+        ]
+    },
+    options: {
+        scales: {
+            x: { title: { display: true, text: '← 上司の支援' }, min: 3, max: 12, reverse: true },
+            y: { title: { display: true, text: '← 同僚の支援' }, min: 3, max: 12, reverse: true },
+        },
+        plugins: { legend: { position: 'bottom' } },
+    }
+});
+
+// 尺度別平均スコア（横棒グラフ）
+const avgData = {{ analysis.summary.avg_scores | tojson }};
+const labels = Object.values(avgData).map(v => v.name);
+const values = Object.values(avgData).map(v => v.mean);
+const colors = values.map(v => v >= 4 ? 'rgba(220,53,69,0.7)' : v >= 3 ? 'rgba(255,193,7,0.7)' : 'rgba(25,135,84,0.7)');
+
+new Chart(document.getElementById('subscaleChart'), {
+    type: 'bar',
+    data: {
+        labels: labels,
+        datasets: [{
+            label: '平均スコア',
+            data: values,
+            backgroundColor: colors,
+        }]
+    },
+    options: {
+        indexAxis: 'y',
+        scales: {
+            x: { min: 0, max: 5, title: { display: true, text: 'スコア（5が最もストレスが高い）' } },
+        },
+        plugins: { legend: { display: false } },
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

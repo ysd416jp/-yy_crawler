@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+{% block title %}ストレスチェック - あなたの結果{% endblock %}
+{% block body_class %}survey-page{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="survey-container py-4">
+    <h2 class="text-center mb-2">あなたのストレスチェック結果</h2>
+    <p class="text-center text-muted mb-4">
+        この結果はあなた自身のためのものです。上司や人事に共有されることはありません。
+    </p>
+
+    <!-- 総合判定 -->
+    <div class="card mb-4 result-summary
+        {% if scores.stress_level == 'high' %}border-danger{% elif scores.stress_level == 'moderate' %}border-warning{% else %}border-success{% endif %}">
+        <div class="card-body text-center">
+            <h5>総合ストレス判定</h5>
+            {% if scores.stress_level == 'high' %}
+            <div class="stress-badge stress-high">高ストレス</div>
+            <p class="mt-2 text-danger">ストレスがやや高い状態です</p>
+            {% elif scores.stress_level == 'moderate' %}
+            <div class="stress-badge stress-moderate">やや注意</div>
+            <p class="mt-2 text-warning">一部注意が必要な領域があります</p>
+            {% else %}
+            <div class="stress-badge stress-low">良好</div>
+            <p class="mt-2 text-success">良好な状態です</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ストレスの3要素 -->
+    <div class="row mb-4">
+        <div class="col-md-4 mb-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">ストレスの原因</h6>
+                    <div class="score-circle
+                        {% if scores.group_scores.A >= 30 %}score-high{% elif scores.group_scores.A >= 22 %}score-moderate{% else %}score-low{% endif %}">
+                        {{ scores.group_scores.A }}
+                    </div>
+                    <small class="text-muted">/ 45</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">心身の反応</h6>
+                    <div class="score-circle
+                        {% if scores.group_scores.B >= 17 %}score-high{% elif scores.group_scores.B >= 12 %}score-moderate{% else %}score-low{% endif %}">
+                        {{ scores.group_scores.B }}
+                    </div>
+                    <small class="text-muted">/ 30</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">周囲のサポート</h6>
+                    <div class="score-circle
+                        {% if scores.group_scores.C >= 10 %}score-high{% elif scores.group_scores.C >= 7 %}score-moderate{% else %}score-low{% endif %}">
+                        {{ scores.group_scores.C }}
+                    </div>
+                    <small class="text-muted">/ 15</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- レーダーチャート: ストレス要因 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title text-center">ストレス要因プロフィール</h5>
+            <div class="chart-container">
+                <canvas id="stressorChart"></canvas>
+            </div>
+            <div class="mt-3 p-3 bg-light rounded">
+                <p class="mb-0 small">{{ comments.stressors }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- レーダーチャート: 心身の反応 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title text-center">心身のストレス反応</h5>
+            <div class="chart-container">
+                <canvas id="reactionChart"></canvas>
+            </div>
+            <div class="mt-3 p-3 bg-light rounded">
+                <p class="mb-0 small">{{ comments.reactions }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- サポート -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title text-center">周囲のサポート</h5>
+            <div class="row text-center">
+                {% for key in ['supervisor_support', 'coworker_support', 'family_support'] %}
+                <div class="col-4">
+                    <div class="support-bar">
+                        <div class="support-fill" style="height: {{ (5 - scores.subscale_scores[key] + 1) / 5 * 100 }}%"></div>
+                    </div>
+                    <small>{{ subscales[key].name|replace('からのサポート', '') }}</small>
+                    <br>
+                    <span class="badge
+                        {% if scores.subscale_scores[key] >= 4 %}bg-danger{% elif scores.subscale_scores[key] >= 3 %}bg-warning{% else %}bg-success{% endif %}">
+                        {{ scores.subscale_scores[key] }}/5
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="mt-3 p-3 bg-light rounded">
+                <p class="mb-0 small">{{ comments.support }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 尺度別スコア一覧 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">尺度別スコア一覧</h5>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>尺度</th>
+                            <th class="text-center">スコア</th>
+                            <th>レベル</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for key, scale in subscales.items() %}
+                        <tr>
+                            <td>{{ scale.name }}</td>
+                            <td class="text-center">
+                                <span class="badge
+                                    {% if scores.subscale_scores[key] >= 4 %}bg-danger
+                                    {% elif scores.subscale_scores[key] >= 3 %}bg-warning text-dark
+                                    {% else %}bg-success{% endif %}">
+                                    {{ scores.subscale_scores[key] }}
+                                </span>
+                            </td>
+                            <td>
+                                {% set level = scores.profile %}
+                                {% if scores.subscale_scores[key] >= 4 %}注意が必要
+                                {% elif scores.subscale_scores[key] >= 3 %}やや高い
+                                {% elif scores.subscale_scores[key] >= 2 %}普通
+                                {% else %}良好{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 総合コメント -->
+    <div class="card mb-4
+        {% if scores.stress_level == 'high' %}border-danger{% elif scores.stress_level == 'moderate' %}border-warning{% endif %}">
+        <div class="card-body">
+            <h5 class="card-title">総合コメント</h5>
+            <p>{{ comments.overall }}</p>
+
+            {% if scores.is_high_stress %}
+            <div class="alert alert-warning mt-3">
+                <strong>医師による面接指導について</strong><br>
+                高ストレスと判定された方は、医師による面接指導を受けることができます。
+                面接指導を希望される場合は、人事担当者または産業医にご相談ください。
+                面接指導を申し出たことを理由に、不利益な取扱いを受けることはありません。
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="text-center text-muted small mb-4">
+        <p>この結果は、厚生労働省「職業性ストレス簡易調査票（57項目）」に基づいて算出されています。</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// チャートデータをAPIから取得
+fetch('{{ url_for("api_result_chart", token=token.token) }}')
+    .then(r => r.json())
+    .then(data => {
+        // ストレス要因レーダーチャート
+        new Chart(document.getElementById('stressorChart'), {
+            type: 'radar',
+            data: {
+                labels: data.stressors.labels,
+                datasets: [{
+                    label: 'あなたのスコア',
+                    data: data.stressors.values,
+                    backgroundColor: 'rgba(220, 53, 69, 0.15)',
+                    borderColor: 'rgba(220, 53, 69, 0.8)',
+                    pointBackgroundColor: 'rgba(220, 53, 69, 1)',
+                    pointRadius: 4,
+                }]
+            },
+            options: {
+                scales: {
+                    r: {
+                        min: 0, max: 5,
+                        ticks: { stepSize: 1, display: false },
+                        pointLabels: { font: { size: 11 } },
+                    }
+                },
+                plugins: { legend: { display: false } },
+            }
+        });
+
+        // ストレス反応レーダーチャート
+        new Chart(document.getElementById('reactionChart'), {
+            type: 'radar',
+            data: {
+                labels: data.reactions.labels,
+                datasets: [{
+                    label: 'あなたのスコア',
+                    data: data.reactions.values,
+                    backgroundColor: 'rgba(255, 193, 7, 0.15)',
+                    borderColor: 'rgba(255, 193, 7, 0.8)',
+                    pointBackgroundColor: 'rgba(255, 193, 7, 1)',
+                    pointRadius: 4,
+                }]
+            },
+            options: {
+                scales: {
+                    r: {
+                        min: 0, max: 5,
+                        ticks: { stepSize: 1, display: false },
+                        pointLabels: { font: { size: 11 } },
+                    }
+                },
+                plugins: { legend: { display: false } },
+            }
+        });
+    });
+</script>
+{% endblock %}
