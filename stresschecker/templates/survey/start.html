@@ -10,7 +10,12 @@
         <div class="card-body text-center">
             <p class="mb-1 text-muted small">受検者</p>
             <h5 class="mb-1">{{ employee.name }} 様</h5>
-            <span class="text-muted small">従業員ID: {{ employee.employee_code }}</span>
+            <p class="mb-0 text-muted small">
+                {{ employee.employee_code }}
+                {% if employee.department %}
+                ／{{ employee.department.parent.name if employee.department.parent else '' }} {{ employee.department.name }}
+                {% endif %}
+            </p>
         </div>
     </div>
 

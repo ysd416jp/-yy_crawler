@@ -20,18 +20,28 @@
         <table class="table table-sm">
             <thead>
                 <tr>
-                    <th>名前</th>
                     <th>社員番号</th>
+                    <th>名前</th>
+                    <th>事業所</th>
                     <th>部署</th>
+                    <th class="text-center">年齢</th>
+                    <th class="text-center">入職年数</th>
+                    <th class="text-center">管理職</th>
                     <th>操作</th>
                 </tr>
             </thead>
             <tbody>
                 {% for e in employees %}
                 <tr>
+                    <td><code class="small">{{ e.employee_code or '-' }}</code></td>
                     <td>{{ e.name }}</td>
-                    <td>{{ e.employee_code or '-' }}</td>
+                    <td>{{ e.department.parent.name if e.department and e.department.parent else '-' }}</td>
                     <td>{{ e.department.name if e.department else '-' }}</td>
+                    <td class="text-center">{{ e.age if e.age is not none else '-' }}</td>
+                    <td class="text-center">{{ e.years_of_service if e.years_of_service is not none else '-' }}年</td>
+                    <td class="text-center">
+                        {% if e.is_manager %}<span class="badge bg-primary">管理職</span>{% endif %}
+                    </td>
                     <td>
                         <form method="POST" action="{{ url_for('delete_employee', emp_id=e.id) }}"
                               onsubmit="return confirm('削除しますか？');" style="display:inline">

@@ -64,9 +64,30 @@ class Employee(db.Model):
     employee_code = db.Column(db.String(50), nullable=True)  # 社員番号（任意）
     name = db.Column(db.String(100), nullable=False)
     department_id = db.Column(db.Integer, db.ForeignKey("departments.id"), nullable=True)
+    birth_date = db.Column(db.Date, nullable=True)
+    hire_date = db.Column(db.Date, nullable=True)
+    is_manager = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     tokens = db.relationship("AccessToken", backref="employee", lazy=True)
+
+    @property
+    def age(self):
+        if not self.birth_date:
+            return None
+        today = date.today()
+        return today.year - self.birth_date.year - (
+            (today.month, today.day) < (self.birth_date.month, self.birth_date.day)
+        )
+
+    @property
+    def years_of_service(self):
+        if not self.hire_date:
+            return None
+        today = date.today()
+        return today.year - self.hire_date.year - (
+            (today.month, today.day) < (self.hire_date.month, self.hire_date.day)
+        )
 
 
 class AccessToken(db.Model):

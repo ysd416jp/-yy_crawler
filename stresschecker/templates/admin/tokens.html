@@ -59,6 +59,7 @@
                     <thead>
                         <tr>
                             <th>名前</th>
+                            <th>事業所</th>
                             <th>部署</th>
                             <th>状態</th>
                             <th>受検URL</th>
@@ -68,6 +69,7 @@
                         {% for tk in tokens %}
                         <tr>
                             <td>{{ tk.employee.name }}</td>
+                            <td>{{ tk.employee.department.parent.name if tk.employee.department and tk.employee.department.parent else '-' }}</td>
                             <td>{{ tk.employee.department.name if tk.employee.department else '-' }}</td>
                             <td>
                                 {% if tk.is_completed %}
