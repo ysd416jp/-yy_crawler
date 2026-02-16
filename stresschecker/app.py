@@ -49,6 +49,46 @@ with app.app_context():
         db.session.add(admin)
         db.session.commit()
 
+    # デモモード: 5名分のテストデータを自動作成
+    if os.environ.get("DEMO_MODE") == "1" and not SurveyPeriod.query.first():
+        depts = [
+            Department(name="本社"),
+            Department(name="A事業所"),
+            Department(name="B事業所"),
+        ]
+        db.session.add_all(depts)
+        db.session.flush()
+
+        demo_employees = [
+            ("田中太郎", depts[0].id),
+            ("佐藤花子", depts[0].id),
+            ("鈴木次郎", depts[1].id),
+            ("高橋三郎", depts[1].id),
+            ("伊藤四郎", depts[2].id),
+        ]
+
+        period = SurveyPeriod(
+            name="2026年度 デモ実施",
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 12, 31),
+            is_active=True,
+        )
+        db.session.add(period)
+        db.session.flush()
+
+        for i, (name, dept_id) in enumerate(demo_employees, 1):
+            emp = Employee(name=name, department_id=dept_id, employee_code=f"E{i:03d}")
+            db.session.add(emp)
+            db.session.flush()
+            tk = AccessToken(
+                employee_id=emp.id,
+                period_id=period.id,
+                token=f"demo{i}",
+            )
+            db.session.add(tk)
+
+        db.session.commit()
+
 
 # =============================================================
 # デコレータ
