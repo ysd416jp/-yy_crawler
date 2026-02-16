@@ -5,6 +5,9 @@ Qwen3-TTS ローカル版 — MacBook Pro (Apple Silicon) 対応
 
 import argparse
 import gc
+import json
+import os
+import re
 import sys
 import tempfile
 
@@ -13,6 +16,35 @@ import numpy as np
 import soundfile as sf
 import torch
 from qwen_tts import Qwen3TTSModel
+
+# ==================================================
+# 読み替え辞書
+# ==================================================
+DICT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tts_dictionary.json")
+
+
+def _load_dictionary() -> dict[str, str]:
+    """辞書ファイルを読み込む。なければ空 dict を返す。"""
+    if os.path.exists(DICT_PATH):
+        with open(DICT_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def _save_dictionary(dic: dict[str, str]):
+    """辞書ファイルへ書き出す。"""
+    with open(DICT_PATH, "w", encoding="utf-8") as f:
+        json.dump(dic, f, ensure_ascii=False, indent=2)
+
+
+def _apply_dictionary(text: str) -> str:
+    """辞書の登録語を長い順に置換する（部分一致の誤爆を防ぐ）。"""
+    dic = _load_dictionary()
+    if not dic:
+        return text
+    # 長いキーから先にマッチさせる
+    pattern = re.compile("|".join(re.escape(k) for k in sorted(dic, key=len, reverse=True)))
+    return pattern.sub(lambda m: dic[m.group()], text)
 
 
 def _reset_model_state(model: Qwen3TTSModel):
@@ -129,6 +161,7 @@ def main():
         if not ref_text.strip():
             raise gr.Error("参照音声のテキストを入力してください")
         _reset_model_state(model_base)
+        text = _apply_dictionary(text)
         lang = LANGUAGES.get(language, "Japanese")
         wavs, sr = model_base.generate_voice_clone(
             text=text, language=lang,
@@ -142,6 +175,7 @@ def main():
         if not text.strip():
             raise gr.Error("テキストを入力してください")
         _reset_model_state(model_custom)
+        text = _apply_dictionary(text)
         lang = LANGUAGES.get(language, "Japanese")
         wavs, sr = model_custom.generate_custom_voice(
             text=text, language=lang, speaker=speaker,
@@ -158,6 +192,7 @@ def main():
         if not instruct_text.strip():
             raise gr.Error("声質の説明を入力してください")
         _reset_model_state(model_design)
+        text = _apply_dictionary(text)
         lang = LANGUAGES.get(language, "Japanese")
         wavs, sr = model_design.generate_voice_design(
             text=text, language=lang, instruct=instruct_text,
@@ -244,6 +279,65 @@ def main():
                     [design_text, design_lang, design_desc],
                     design_output,
                 )
+
+        # === 読み替え辞書 ===
+        with gr.Tab("読み替え辞書"):
+            gr.Markdown(
+                "イントネーションや読みがおかしい単語を登録すると、"
+                "TTS 生成前に自動で置換されます。\n\n"
+                "例: `AWS` → `エーダブリューエス` / `齟齬` → `そご`"
+            )
+
+            def _dict_to_table() -> list[list[str]]:
+                dic = _load_dictionary()
+                if not dic:
+                    return []
+                return [[k, v] for k, v in dic.items()]
+
+            dict_table = gr.Dataframe(
+                headers=["元の表記", "読み替え"],
+                datatype=["str", "str"],
+                value=_dict_to_table,
+                label="登録済み辞書",
+                interactive=False,
+                row_count=(1, "dynamic"),
+            )
+
+            with gr.Row():
+                dict_word = gr.Textbox(label="元の表記", placeholder="例: AWS")
+                dict_reading = gr.Textbox(label="読み替え", placeholder="例: エーダブリューエス")
+            with gr.Row():
+                dict_add_btn = gr.Button("追加 / 更新", variant="primary")
+                dict_del_btn = gr.Button("削除", variant="stop")
+
+            dict_status = gr.Textbox(label="結果", interactive=False)
+
+            def _add_entry(word, reading):
+                if not word.strip() or not reading.strip():
+                    return _dict_to_table(), "元の表記と読み替えの両方を入力してください"
+                dic = _load_dictionary()
+                dic[word.strip()] = reading.strip()
+                _save_dictionary(dic)
+                return _dict_to_table(), f"登録: {word.strip()} → {reading.strip()}"
+
+            def _del_entry(word):
+                if not word.strip():
+                    return _dict_to_table(), "削除する元の表記を入力してください"
+                dic = _load_dictionary()
+                if word.strip() in dic:
+                    del dic[word.strip()]
+                    _save_dictionary(dic)
+                    return _dict_to_table(), f"削除: {word.strip()}"
+                return _dict_to_table(), f"「{word.strip()}」は辞書に未登録です"
+
+            dict_add_btn.click(_add_entry, [dict_word, dict_reading], [dict_table, dict_status])
+            dict_del_btn.click(_del_entry, [dict_word], [dict_table, dict_status])
+
+            gr.Markdown("---")
+            gr.Markdown(
+                "**ヒント**: 辞書は `tts_dictionary.json` に保存されます。"
+                "テキストエディタで直接編集も可能です。"
+            )
 
         gr.Markdown("---")
         gr.Markdown("Powered by [Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS)")
