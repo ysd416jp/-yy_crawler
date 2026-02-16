@@ -4,6 +4,7 @@ Qwen3-TTS ローカル版 — MacBook Pro (Apple Silicon) 対応
 """
 
 import argparse
+import gc
 import sys
 import tempfile
 
@@ -12,6 +13,24 @@ import numpy as np
 import soundfile as sf
 import torch
 from qwen_tts import Qwen3TTSModel
+
+
+def _reset_model_state(model: Qwen3TTSModel):
+    """生成間で残留する内部状態をクリアし、2回目以降の音声破綻を防ぐ。"""
+    inner = getattr(model, "model", None)
+    if inner is None:
+        return
+    # Transformer 層の rope_deltas / past_hidden をリセット
+    if hasattr(inner, "rope_deltas"):
+        inner.rope_deltas = None
+    if hasattr(inner, "generation_step"):
+        inner.generation_step = -1
+    if hasattr(inner, "past_hidden"):
+        inner.past_hidden = None
+    # GPU キャッシュも念のため解放
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    gc.collect()
 
 
 # ==================================================
@@ -109,6 +128,7 @@ def main():
             raise gr.Error("参照音声をアップロードしてください")
         if not ref_text.strip():
             raise gr.Error("参照音声のテキストを入力してください")
+        _reset_model_state(model_base)
         lang = LANGUAGES.get(language, "Japanese")
         wavs, sr = model_base.generate_voice_clone(
             text=text, language=lang,
@@ -121,6 +141,7 @@ def main():
     def tts_generate(text, speaker, language):
         if not text.strip():
             raise gr.Error("テキストを入力してください")
+        _reset_model_state(model_custom)
         lang = LANGUAGES.get(language, "Japanese")
         wavs, sr = model_custom.generate_custom_voice(
             text=text, language=lang, speaker=speaker,
@@ -136,6 +157,7 @@ def main():
             raise gr.Error("テキストを入力してください")
         if not instruct_text.strip():
             raise gr.Error("声質の説明を入力してください")
+        _reset_model_state(model_design)
         lang = LANGUAGES.get(language, "Japanese")
         wavs, sr = model_design.generate_voice_design(
             text=text, language=lang, instruct=instruct_text,
