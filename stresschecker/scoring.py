@@ -8,6 +8,8 @@
   - 5が最もストレスが高い状態
 """
 
+import math
+
 from questions import SUBSCALES, QUESTIONS
 
 # =============================================================
@@ -222,23 +224,42 @@ def _score_to_level(score):
 
 # =============================================================
 # 集団分析用: 仕事のストレス判定図の計算
+# 東京大学テクニカルノート準拠（多重ロジスティックモデル）
+# 計算式: 健康リスク = 100 × exp((得点 - 全国平均) × 回帰係数 + ...)
 # =============================================================
 
-# 全国平均値（職業性ストレス簡易調査票マニュアルより）
-NATIONAL_AVERAGES = {
-    "workload_quantity": {"mean": 7.6, "sd": 2.1},  # 量的負担
-    "job_control": {"mean": 7.4, "sd": 2.1},  # コントロール
-    "supervisor_support": {"mean": 7.5, "sd": 2.4},  # 上司支援
-    "coworker_support": {"mean": 7.9, "sd": 2.1},  # 同僚支援
+# 仕事のストレス判定図 係数テーブル
+# 出典: 東京大学大学院医学系研究科精神保健学分野テクニカルノート
+#       平成11年度労働省「作業関連疾患の予防に関する研究」報告書
+#
+# 性別ごとに全国平均(mean)と回帰係数(coeff)が異なる
+# coeff の符号: 量的負荷は正(高いほどリスク高), 他は負(高いほどリスク低)
+HEALTH_RISK_COEFFICIENTS = {
+    "male": {
+        "workload_quantity":  {"mean": 7.63, "coeff": 0.11},
+        "job_control":        {"mean": 7.32, "coeff": -0.09},
+        "supervisor_support": {"mean": 7.35, "coeff": -0.09},
+        "coworker_support":   {"mean": 7.85, "coeff": -0.09},
+    },
+    "female": {
+        "workload_quantity":  {"mean": 6.00, "coeff": 0.11},
+        "job_control":        {"mean": 6.30, "coeff": -0.09},
+        "supervisor_support": {"mean": 6.76, "coeff": -0.09},
+        "coworker_support":   {"mean": 8.00, "coeff": -0.09},
+    },
 }
 
 
-def calculate_group_analysis(all_results):
+def calculate_group_analysis(all_results, gender="male"):
     """
     集団分析（仕事のストレス判定図）を計算する
 
+    東京大学テクニカルノート準拠の多重ロジスティックモデルを使用。
+    健康リスク = 100 × exp(Σ(得点 - 全国平均) × 回帰係数)
+
     Args:
         all_results: list of calculate_scores() の結果
+        gender: "male" or "female"（係数テーブルの選択）
 
     Returns:
         dict with:
@@ -258,12 +279,13 @@ def calculate_group_analysis(all_results):
     avg_supervisor = sum(r["subscale_raw"]["supervisor_support"] for r in all_results) / n
     avg_coworker = sum(r["subscale_raw"]["coworker_support"] for r in all_results) / n
 
-    # 健康リスク計算（全国平均=100として標準化）
-    # 量-コントロール判定図のリスク
-    demand_risk = _calc_demand_control_risk(avg_workload, avg_control)
+    coeffs = HEALTH_RISK_COEFFICIENTS.get(gender, HEALTH_RISK_COEFFICIENTS["male"])
 
-    # 職場の支援判定図のリスク
-    support_risk = _calc_support_risk(avg_supervisor, avg_coworker)
+    # 量-コントロール判定図の健康リスク
+    demand_risk = _calc_demand_control_risk(avg_workload, avg_control, coeffs)
+
+    # 職場の支援判定図の健康リスク
+    support_risk = _calc_support_risk(avg_supervisor, avg_coworker, coeffs)
 
     # 総合健康リスク
     total_risk = round(demand_risk * support_risk / 100)
@@ -303,31 +325,37 @@ def calculate_group_analysis(all_results):
     }
 
 
-def _calc_demand_control_risk(workload, control):
-    """量-コントロール判定図から健康リスクを算出"""
-    nat_wl = NATIONAL_AVERAGES["workload_quantity"]
-    nat_ct = NATIONAL_AVERAGES["job_control"]
+def _calc_demand_control_risk(workload, control, coeffs):
+    """
+    量-コントロール判定図から健康リスクを算出
 
-    # 標準化スコア（全国平均からの偏差）
-    wl_z = (workload - nat_wl["mean"]) / nat_wl["sd"]
-    ct_z = (control - nat_ct["mean"]) / nat_ct["sd"]
+    多重ロジスティックモデル:
+    risk = 100 × exp((量的負荷 - 全国平均) × α + (コントロール - 全国平均) × β)
+    """
+    wl = coeffs["workload_quantity"]
+    ct = coeffs["job_control"]
 
-    # リスク = 需要が高く、コントロールが低いほど高い
-    # 100を基準として計算
-    risk = 100 + (wl_z * 10) - (ct_z * 10)
+    exponent = (workload - wl["mean"]) * wl["coeff"] + \
+               (control - ct["mean"]) * ct["coeff"]
+
+    risk = 100 * math.exp(exponent)
     return max(50, min(200, round(risk)))
 
 
-def _calc_support_risk(supervisor, coworker):
-    """職場の支援判定図から健康リスクを算出"""
-    nat_sv = NATIONAL_AVERAGES["supervisor_support"]
-    nat_cw = NATIONAL_AVERAGES["coworker_support"]
+def _calc_support_risk(supervisor, coworker, coeffs):
+    """
+    職場の支援判定図から健康リスクを算出
 
-    sv_z = (supervisor - nat_sv["mean"]) / nat_sv["sd"]
-    cw_z = (coworker - nat_cw["mean"]) / nat_cw["sd"]
+    多重ロジスティックモデル:
+    risk = 100 × exp((上司支援 - 全国平均) × γ + (同僚支援 - 全国平均) × δ)
+    """
+    sv = coeffs["supervisor_support"]
+    cw = coeffs["coworker_support"]
 
-    # サポートが低いほどリスクが高い
-    risk = 100 - (sv_z * 10) - (cw_z * 10)
+    exponent = (supervisor - sv["mean"]) * sv["coeff"] + \
+               (coworker - cw["mean"]) * cw["coeff"]
+
+    risk = 100 * math.exp(exponent)
     return max(50, min(200, round(risk)))
 
 
